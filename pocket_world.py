@@ -48,6 +48,7 @@ MOVE_DELAY_RUNNING = 4
 O2_MAX = 20 * 60  # 40 seconds at 60fps
 O2_BREATHE_REFILL = 10 * 60  # 20 seconds refill per key press
 O2_AUTO_REFILL_RATE = 4  # frames of O2 restored per frame when auto-breathing
+O2_LUNGS_UNDERWATER_CHUNK = 3 * 60  # 3 seconds of O2 lost per gulp (every second)
 
 # Breathing modes
 LUNGS = "lungs"
@@ -271,8 +272,12 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             if model.state == "play" and model.tilemap:
                 underwater = model.tilemap[model.player_pos.y][model.player_pos.x] == WATER
                 can_auto_breathe = (model.breathing_mode == LUNGS and not underwater)
+                lungs_underwater = (model.breathing_mode == LUNGS and underwater)
                 if can_auto_breathe:
                     new_o2 = min(O2_MAX, new_o2 + O2_AUTO_REFILL_RATE)
+                elif lungs_underwater and model.frame % 60 == 0:
+                    # Big painful gulps every second
+                    new_o2 = max(0, new_o2 - O2_LUNGS_UNDERWATER_CHUNK)
                 else:
                     new_o2 = max(0, new_o2 - 1)
             return replace(
