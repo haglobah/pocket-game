@@ -34,7 +34,7 @@ from .constants import (
     is_walkable,
     is_swimmable,
 )
-from .model import Model, ThoughtBubble
+from .model import Model, Map, ThoughtBubble
 from .messages import (
     Msg,
     Tick,
@@ -57,36 +57,11 @@ from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThough
 from .thoughts import check_triggers, get_memory
 
 
-def init() -> tuple[Model, list[Cmd]]:
-    model = Model(
-        player_pos=Point(MAP_W // 2, MAP_H // 2),
-        facing=DOWN,
-        tilemap=(),
-        seed=0,
-        move_timer=0,
-        state="title",
-        seed_input="",
-        frame=0,
-        o2=O2_MAX,
-        breathing_mode=GILLS,
-        cycle=1,
-        death_reason="",
-        learned=(),
-        death_timer=0,
-        rewind_timer=0,
-        thought=None,
-        seen_memories=(),
-        thought_cooldown=0,
-        sprinting=False,
-    )
-    return model, []
-
-
-def _add_learned(model: Model, skill: str) -> tuple[str, ...]:
+def _add_learned(cycle, skill: str) -> tuple[str, ...]:
     """Add a skill to learned if not already present."""
-    if skill in model.learned:
-        return model.learned
-    return model.learned + (skill,)
+    if skill in cycle.learned:
+        return cycle.learned
+    return cycle.learned + (skill,)
 
 
 def _wrap(p: Point) -> Point:
@@ -122,44 +97,45 @@ def _find_spawn(tilemap: tuple[tuple[int, ...], ...]) -> Point:
 
 
 def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
+    player = model.player
+    map_ = model.map
+    cycle = model.cycle
+    game = model.game
+
     match msg:
         case Tick():
-            if model.state == "dead":
-                return replace(
-                    model, death_timer=model.death_timer + 1, frame=model.frame + 1
+            if game.state == "dead":
+                return replace(model,
+                    cycle=replace(cycle, death_timer=cycle.death_timer + 1),
+                    game=replace(game, frame=game.frame + 1),
                 ), []
-            new_o2 = model.o2
-            new_thought = model.thought
-            new_seen = model.seen_memories
-            new_cooldown = model.thought_cooldown
+            new_o2 = player.o2
+            new_thought = game.thought
+            new_seen = game.seen_memories
+            new_cooldown = game.thought_cooldown
             cmds: list[Cmd] = []
-            if model.state == "play" and model.tilemap:
-                underwater = (
-                    is_swimmable(model.tilemap[model.player_pos.y][model.player_pos.x])
-                )
-                can_auto_breathe = model.breathing_mode == LUNGS and not underwater
-                lungs_underwater = model.breathing_mode == LUNGS and underwater
+            if game.state == "play" and map_.tilemap:
+                underwater = is_swimmable(map_.tilemap[player.pos.y][player.pos.x])
+                can_auto_breathe = player.breathing_mode == LUNGS and not underwater
+                lungs_underwater = player.breathing_mode == LUNGS and underwater
                 if can_auto_breathe:
                     new_o2 = min(O2_MAX, new_o2 + O2_AUTO_REFILL_RATE)
-                elif lungs_underwater and model.frame % 60 == 0:
+                elif lungs_underwater and game.frame % 60 == 0:
                     new_o2 = max(0, new_o2 - O2_LUNGS_UNDERWATER_CHUNK)
                 else:
                     new_o2 = max(0, new_o2 - 1)
                 # Check for O2 death
                 if new_o2 <= 0:
-                    if model.breathing_mode == LUNGS and underwater:
+                    if player.breathing_mode == LUNGS and underwater:
                         reason = "Drowned (lungs underwater)"
-                    elif model.breathing_mode == GILLS:
+                    elif player.breathing_mode == GILLS:
                         reason = "Suffocated (gills ran dry)"
                     else:
                         reason = "Ran out of oxygen"
-                    return replace(
-                        model,
-                        frame=model.frame + 1,
-                        o2=0,
-                        state="dead",
-                        death_reason=reason,
-                        death_timer=0,
+                    return replace(model,
+                        player=replace(player, o2=0),
+                        cycle=replace(cycle, death_reason=reason, death_timer=0),
+                        game=replace(game, frame=game.frame + 1, state="dead"),
                     ), []
                 # Thought bubble management
                 new_cooldown = max(0, new_cooldown - 1)
@@ -173,7 +149,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     else:
                         new_thought = replace(new_thought, timer=new_timer)
                 elif new_cooldown == 0:
-                    triggered = check_triggers(model.cycle, model.learned, new_seen)
+                    triggered = check_triggers(cycle.number, cycle.learned, new_seen)
                     if triggered is not None:
                         mem = get_memory(triggered)
                         duration = (
@@ -188,188 +164,163 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                         cmds.append(PlayThoughtSound())
 
             # Deplete hydration and hunger
-            new_hydration = max(0, model.hydration - HYDRATION_DEPLETION)
-            new_hunger = max(0, model.hunger - HUNGER_DEPLETION)
-            if model.state == "play":
+            new_hydration = max(0, player.hydration - HYDRATION_DEPLETION)
+            new_hunger = max(0, player.hunger - HUNGER_DEPLETION)
+            if game.state == "play":
                 if new_hydration <= 0:
-                    return replace(
-                        model,
-                        frame=model.frame + 1,
-                        hydration=0,
-                        hunger=new_hunger,
-                        o2=new_o2,
-                        state="dead",
-                        death_reason="Died of dehydration",
-                        death_timer=0,
+                    return replace(model,
+                        player=replace(player, o2=new_o2, hydration=0, hunger=new_hunger),
+                        cycle=replace(cycle, death_reason="Died of dehydration", death_timer=0),
+                        game=replace(game, frame=game.frame + 1, state="dead"),
                     ), []
                 if new_hunger <= 0:
-                    return replace(
-                        model,
-                        frame=model.frame + 1,
-                        hunger=0,
-                        hydration=new_hydration,
-                        o2=new_o2,
-                        state="dead",
-                        death_reason="Died of starvation",
-                        death_timer=0,
+                    return replace(model,
+                        player=replace(player, o2=new_o2, hydration=new_hydration, hunger=0),
+                        cycle=replace(cycle, death_reason="Died of starvation", death_timer=0),
+                        game=replace(game, frame=game.frame + 1, state="dead"),
                     ), []
-            return replace(
-                model,
-                move_timer=max(0, model.move_timer - 1),
-                frame=model.frame + 1,
-                o2=new_o2,
-                thought=new_thought,
-                seen_memories=new_seen,
-                thought_cooldown=new_cooldown,
-                hydration=new_hydration,
-                hunger=new_hunger,
+            return replace(model,
+                player=replace(player,
+                    move_timer=max(0, player.move_timer - 1),
+                    o2=new_o2,
+                    hydration=new_hydration,
+                    hunger=new_hunger,
+                ),
+                game=replace(game,
+                    frame=game.frame + 1,
+                    thought=new_thought,
+                    seen_memories=new_seen,
+                    thought_cooldown=new_cooldown,
+                ),
             ), cmds
 
         case MoveDir(direction=d):
-            if model.state != "play":
+            if game.state != "play":
                 return model, []
-            if model.move_timer > 0:
-                # Still in cooldown, just update facing
-                return replace(model, facing=d), []
-            raw = Point(model.player_pos.x + d.x, model.player_pos.y + d.y)
+            if player.move_timer > 0:
+                return replace(model, player=replace(player, facing=d)), []
+            raw = Point(player.pos.x + d.x, player.pos.y + d.y)
             new_pos = Point(raw.x % MAP_W, raw.y % MAP_H)
-            if is_walkable(model.tilemap[new_pos.y][new_pos.x]):
-                delay = MOVE_DELAY_RUNNING if model.sprinting else MOVE_DELAY_LAND
-                skill = "sprinting" if model.sprinting else "walking on land"
-                return replace(
-                    model,
-                    player_pos=new_pos,
-                    facing=d,
-                    move_timer=delay,
-                    learned=_add_learned(model, skill),
+            if is_walkable(map_.tilemap[new_pos.y][new_pos.x]):
+                delay = MOVE_DELAY_RUNNING if player.sprinting else MOVE_DELAY_LAND
+                skill = "sprinting" if player.sprinting else "walking on land"
+                return replace(model,
+                    player=replace(player, pos=new_pos, facing=d, move_timer=delay),
+                    cycle=replace(cycle, learned=_add_learned(cycle, skill)),
                 ), [PlayStepSound()]
-            if is_swimmable(model.tilemap[new_pos.y][new_pos.x]):
-                return replace(
-                    model,
-                    player_pos=new_pos,
-                    facing=d,
-                    move_timer=MOVE_DELAY_WATER,
-                    learned=_add_learned(model, "swimming"),
+            if is_swimmable(map_.tilemap[new_pos.y][new_pos.x]):
+                return replace(model,
+                    player=replace(player, pos=new_pos, facing=d, move_timer=MOVE_DELAY_WATER),
+                    cycle=replace(cycle, learned=_add_learned(cycle, "swimming")),
                 ), [PlaySwimSound()]
-            return replace(model, facing=d, move_timer=0), []
+            return replace(model, player=replace(player, facing=d, move_timer=0)), []
 
         case StartGame(seed=s):
             return model, [GenerateMap(seed=s)]
 
         case MapGenerated(tilemap=tm, seed=s):
             spawn = _find_spawn(tm)
-            return replace(
-                model,
-                player_pos=spawn,
-                tilemap=tm,
-                seed=s,
-                state="play",
-                o2=O2_MAX,
-                learned=(),
-                death_reason="",
-                death_timer=0,
-                rewind_timer=0,
-                thought=None,
-                thought_cooldown=THOUGHT_INITIAL_DELAY,
+            return replace(model,
+                player=replace(player, pos=spawn),
+                map=Map(tilemap=tm, seed=s),
+                cycle=replace(cycle, death_reason="", death_timer=0, rewind_timer=0, learned=()),
+                game=replace(game,
+                    state="play",
+                    thought=None,
+                    thought_cooldown=THOUGHT_INITIAL_DELAY,
+                ),
             ), []
 
         case TypeChar(char=c):
-            if model.state == "title" and len(model.seed_input) < 16:
-                return replace(model, seed_input=model.seed_input + c), []
+            if game.state == "title" and len(game.seed_input) < 16:
+                return replace(model, game=replace(game, seed_input=game.seed_input + c)), []
             return model, []
 
         case Backspace():
-            if model.state == "title" and model.seed_input:
-                return replace(model, seed_input=model.seed_input[:-1]), []
+            if game.state == "title" and game.seed_input:
+                return replace(model, game=replace(game, seed_input=game.seed_input[:-1])), []
             return model, []
 
         case Breathe():
-            if model.state != "play" or not model.tilemap:
+            if game.state != "play" or not map_.tilemap:
                 return model, []
-            underwater = is_swimmable(model.tilemap[model.player_pos.y][model.player_pos.x])
-            if model.breathing_mode == GILLS and underwater:
-                new_o2 = min(O2_MAX, model.o2 + O2_BREATHE_REFILL)
-                return replace(
-                    model,
-                    o2=new_o2,
-                    learned=_add_learned(model, "breathing underwater"),
+            underwater = is_swimmable(map_.tilemap[player.pos.y][player.pos.x])
+            if player.breathing_mode == GILLS and underwater:
+                new_o2 = min(O2_MAX, player.o2 + O2_BREATHE_REFILL)
+                return replace(model,
+                    player=replace(player, o2=new_o2),
+                    cycle=replace(cycle, learned=_add_learned(cycle, "breathing underwater")),
                 ), []
             return model, []
 
         case ToggleBreathingMode():
-            new_mode = GILLS if model.breathing_mode == LUNGS else LUNGS
+            new_mode = GILLS if player.breathing_mode == LUNGS else LUNGS
             skill = "switching to lungs" if new_mode == LUNGS else "switching to gills"
-            return replace(
-                model,
-                breathing_mode=new_mode,
-                learned=_add_learned(model, skill),
+            return replace(model,
+                player=replace(player, breathing_mode=new_mode),
+                cycle=replace(cycle, learned=_add_learned(cycle, skill)),
             ), []
 
         case Drink():
-            if model.state != "play" or not model.tilemap:
+            if game.state != "play" or not map_.tilemap:
                 return model, []
-            nearby = _adjacent_tiles(model.player_pos, model.tilemap)
-            standing = model.tilemap[model.player_pos.y][model.player_pos.x]
+            nearby = _adjacent_tiles(player.pos, map_.tilemap)
+            standing = map_.tilemap[player.pos.y][player.pos.x]
             if standing in DRINK_TILES or any(t in DRINK_TILES for t in nearby):
-                new_hydration = min(HYDRATION_MAX, model.hydration + HYDRATION_REFILL)
-                return replace(
-                    model,
-                    hydration=new_hydration,
-                    learned=_add_learned(model, "drinking water"),
+                new_hydration = min(HYDRATION_MAX, player.hydration + HYDRATION_REFILL)
+                return replace(model,
+                    player=replace(player, hydration=new_hydration),
+                    cycle=replace(cycle, learned=_add_learned(cycle, "drinking water")),
                 ), []
             return model, []
 
         case Eat():
-            if model.state != "play" or not model.tilemap:
+            if game.state != "play" or not map_.tilemap:
                 return model, []
-            nearby = _adjacent_tiles(model.player_pos, model.tilemap)
-            standing = model.tilemap[model.player_pos.y][model.player_pos.x]
+            nearby = _adjacent_tiles(player.pos, map_.tilemap)
+            standing = map_.tilemap[player.pos.y][player.pos.x]
             if standing in FOOD_TILES or any(t in FOOD_TILES for t in nearby):
-                new_hunger = min(HUNGER_MAX, model.hunger + HUNGER_REFILL)
-                return replace(
-                    model,
-                    hunger=new_hunger,
-                    learned=_add_learned(model, "eating plants"),
+                new_hunger = min(HUNGER_MAX, player.hunger + HUNGER_REFILL)
+                return replace(model,
+                    player=replace(player, hunger=new_hunger),
+                    cycle=replace(cycle, learned=_add_learned(cycle, "eating plants")),
                 ), []
             return model, []
 
         case ToggleMinimap():
-            if model.state == "play":
-                return replace(model, show_minimap=not model.show_minimap), []
+            if game.state == "play":
+                return replace(model, game=replace(game, show_minimap=not game.show_minimap)), []
             return model, []
 
         case Die(reason=r):
-            return replace(
-                model,
-                state="dead",
-                death_reason=r,
-                death_timer=0,
+            return replace(model,
+                cycle=replace(cycle, death_reason=r, death_timer=0),
+                game=replace(game, state="dead"),
             ), []
 
         case DismissDeathScreen():
-            if model.state == "dead" and model.death_timer >= DEATH_SCREEN_MIN_FRAMES:
-                return replace(
-                    model,
-                    state="rewind",
-                    rewind_timer=REWIND_DURATION,
+            if game.state == "dead" and cycle.death_timer >= DEATH_SCREEN_MIN_FRAMES:
+                return replace(model,
+                    cycle=replace(cycle, rewind_timer=REWIND_DURATION),
+                    game=replace(game, state="rewind"),
                 ), []
             return model, []
 
         case SetSprinting(active=a):
-            return replace(model, sprinting=a), []
+            return replace(model, player=replace(player, sprinting=a)), []
 
         case RewindTick():
-            if model.state == "rewind":
-                new_timer = model.rewind_timer - 1
+            if game.state == "rewind":
+                new_timer = cycle.rewind_timer - 1
                 if new_timer <= 0:
-                    # Respawn with same seed, next cycle
-                    return replace(
-                        model,
-                        state="play",
-                        cycle=model.cycle + 1,
-                        rewind_timer=0,
-                    ), [GenerateMap(seed=model.seed)]
-                return replace(model, rewind_timer=new_timer, frame=model.frame + 1), []
+                    return replace(model,
+                        cycle=replace(cycle, number=cycle.number + 1, rewind_timer=0),
+                        game=replace(game, state="play"),
+                    ), [GenerateMap(seed=map_.seed)]
+                return replace(model,
+                    cycle=replace(cycle, rewind_timer=new_timer),
+                    game=replace(game, frame=game.frame + 1),
+                ), []
             return model, []
 
     return model, []
