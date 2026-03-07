@@ -3,7 +3,6 @@
 ## Architecture
 
 All games follow the **Elm Architecture** (Model-Update-View) adapted for Python/Pyxel.
-See `pyxel_examples/07_snake.py` for the reference implementation.
 
 The main game is `pocket_world.py`.
 
@@ -145,4 +144,4 @@ pocket/
 - Colors: Pyxel has a fixed 16-color palette (0-15).
 - Sounds: Define in a `define_sounds()` function, use `pyxel.sounds[n].set(...)`.
 - Input: `pyxel.btn()` for held keys, `pyxel.btnp()` for press events.
-- Run: `python <game>.py` — no build step.
+- Run: `pyxel run pocket_world.py` — no build step.

@@ -8,7 +8,7 @@ TRACK_ID = 0
 class App:
     def __init__(self):
         pyxel.init(200, 150, title="Pyxel Sound API")
-        pyxel.load(RESOURCE_FILE, excl_images=True, excl_tilemaps=True)
+        pyxel.load(RESOURCE_FILE, exclude_images=True, excl_tilemaps=True)
         self.track_channels = self._read_track_channels(TRACK_ID)
 
         pyxel.images[0].set(
