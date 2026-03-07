@@ -21,8 +21,8 @@
 # Core Mechanics
 
 ## Movement
-- [ ] Walk in all 4 directions
-- [ ] Diagonal movement (hold two directions at once)
+- [x] Walk in all 4 directions
+- [x] Diagonal movement (hold two directions at once)
 - [ ] Jump mechanic (progressive — learn to jump higher over time)
 - [ ] Sprint mechanic (unlocked via boots trial)
 
@@ -164,6 +164,7 @@ Each ability is learned through a trial with deadly choices and skill-based clue
 - [ ] Diagonal movement (hold two directions at once)
 - [ ] Save game?
 - [x] Make text bigger
+- [ ] Minimap only shows explored area
 
 # Art Style
 

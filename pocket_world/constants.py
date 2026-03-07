@@ -21,6 +21,10 @@ CACTUS = 5
 DEAD_BUSH = 6
 ROCK = 7
 WATER = 8
+WATER_DEEP = 9
+BUSH_GREEN = 10
+BUSH_FLOWERING = 11
+BUSH_BERRY = 12
 
 # Keep old names mapped for compatibility
 GRASS = SAND
@@ -32,11 +36,11 @@ BUSH = DEAD_BUSH
 
 
 def is_walkable(tile: int) -> bool:
-    return tile in (SAND, SAND_DARK, DEAD_BUSH)
+    return tile in (SAND, SAND_DARK, DEAD_BUSH, BUSH_GREEN, BUSH_FLOWERING, BUSH_BERRY)
 
 
 def is_swimmable(tile: int) -> bool:
-    return tile == WATER
+    return tile in (WATER, WATER_DEEP)
 
 
 # Movement speed (frames between steps)
@@ -51,18 +55,20 @@ O2_AUTO_REFILL_RATE = 4  # frames of O2 restored per frame when auto-breathing
 O2_LUNGS_UNDERWATER_CHUNK = 3 * 60  # 3 seconds of O2 lost per gulp (every second)
 
 # Hydration system
-HYDRATION_MAX = 45 * 60  # 45 seconds at 60fps
-HYDRATION_REFILL = 20 * 60  # 20 seconds per drink
+HYDRATION_MAX = 5 * 60 * 60  # 5 min at 60fps
+HYDRATION_START = 1 * 60 * 60 # 1 min at 60fps
+HYDRATION_REFILL = 1 * 60 * 60  # 1 min per gulp
 HYDRATION_DEPLETION = 1  # frames lost per frame
 
 # Hunger system
-HUNGER_MAX = 60 * 60  # 60 seconds at 60fps
-HUNGER_REFILL = 25 * 60  # 25 seconds per eat
+HUNGER_MAX = 10 * 60 * 60  # 10 min at 60fps
+HUNGER_START = 3 * 60 * 60  # 10 min at 60fps
+HUNGER_REFILL = 5 * 60 * 60  # 5 min per eat
 HUNGER_DEPLETION = 1  # frames lost per frame
 
 # Edible / drinkable tiles
-FOOD_TILES = (4, 5)  # PALM_TREE, CACTUS
-DRINK_TILES = (8,)  # WATER
+FOOD_TILES = (4, 5, 12)  # PALM_TREE, CACTUS, BUSH_BERRY
+DRINK_TILES = (8, 9)  # WATER, WATER_DEEP
 
 # Death screen / rewind
 DEATH_SCREEN_MIN_FRAMES = 60  # minimum frames before ENTER accepted

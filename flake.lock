@@ -112,11 +112,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1772904202,
-        "narHash": "sha256-tvqnoBWzbx5pNCrF1o0zypThETPjmrDOfjRztSpVYbo=",
+        "lastModified": 1772919283,
+        "narHash": "sha256-JfeQIkRUV3wjJ4IAn2MiHTBIZSE+DAVsXZ+PgohPM3Q=",
         "owner": "haglobah",
         "repo": "pyxel",
-        "rev": "23a3d52815f21ae1f9c8615e4ab99aa3eb851c55",
+        "rev": "41533107ef1b6289c87a63fb992ddbb68088175d",
         "type": "github"
       },
       "original": {

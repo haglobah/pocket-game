@@ -19,6 +19,7 @@ from .messages import (
     ToggleMinimap,
     DismissDeathScreen,
     RewindTick,
+    SetSprinting,
 )
 from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound
 from .mapgen import generate_map
@@ -81,7 +82,7 @@ class App:
     def _collect_input(self) -> list[Msg]:
         msgs: list[Msg] = []
 
-        if self.model.state == "title":
+        if self.model.game.state == "title":
             # Text input for seed
             for char, key in PYXEL_KEYS.items():
                 if pyxel.btnp(key, hold=15, repeat=3):
@@ -89,7 +90,7 @@ class App:
             if pyxel.btnp(pyxel.KEY_BACKSPACE, hold=15, repeat=3):
                 msgs.append(Backspace())
             if pyxel.btnp(pyxel.KEY_RETURN):
-                seed_text = self.model.seed_input.strip()
+                seed_text = self.model.game.seed_input.strip()
                 if seed_text:
                     seed = int(hashlib.md5(seed_text.encode()).hexdigest(), 16) % (
                         2**31
@@ -98,7 +99,7 @@ class App:
                     seed = pyxel.rndi(0, 2**31 - 1)
                 msgs.append(StartGame(seed=seed))
 
-        elif self.model.state == "play":
+        elif self.model.game.state == "play":
             dx = 0
             dy = 0
             if pyxel.btn(pyxel.KEY_LEFT) or pyxel.btn(pyxel.KEY_A):
@@ -121,12 +122,13 @@ class App:
                 msgs.append(Eat())
             if pyxel.btnp(pyxel.KEY_M):
                 msgs.append(ToggleMinimap())
+            msgs.append(SetSprinting(active=pyxel.btn(pyxel.KEY_C)))
 
-        elif self.model.state == "dead":
+        elif self.model.game.state == "dead":
             if pyxel.btnp(pyxel.KEY_RETURN):
                 msgs.append(DismissDeathScreen())
 
-        elif self.model.state == "rewind":
+        elif self.model.game.state == "rewind":
             msgs.append(RewindTick())
 
         msgs.append(Tick())

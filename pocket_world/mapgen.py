@@ -11,6 +11,11 @@ from .constants import (
     CACTUS,
     DEAD_BUSH,
     ROCK,
+    WATER,
+    WATER_DEEP,
+    BUSH_GREEN,
+    BUSH_FLOWERING,
+    BUSH_BERRY,
 )
 
 
@@ -116,5 +121,101 @@ def generate_map(seed: int) -> tuple[tuple[int, ...], ...]:
     tiles = np.where(flat & (scatter > 0.975) & (tiles == SAND), ROCK, tiles)
     tiles = np.where(flat & (detail > 0.55) & (tiles == SAND), SAND_DARK, tiles)
 
+    # --- Oasis generation ~150 tiles from spawn (center) ---
+    _place_oases(tiles, elev, scatter, seed)
+
     # Convert to tuple[tuple[int, ...], ...]
     return tuple(tuple(int(v) for v in row) for row in tiles)
+
+
+def _place_oases(
+    tiles: np.ndarray,
+    elev: np.ndarray,
+    scatter: np.ndarray,
+    seed: int,
+) -> None:
+    """Place oases in low-elevation basins roughly 150 tiles from center."""
+    cx, cy = MAP_W // 2, MAP_H // 2
+
+    # Distance from center for every tile
+    xs = np.arange(MAP_W, dtype=np.float32)
+    ys = np.arange(MAP_H, dtype=np.float32)
+    dist = np.sqrt((xs[None, :] - cx) ** 2 + (ys[:, None] - cy) ** 2)
+
+    # Ring mask: 100–200 tiles from center
+    ring = (dist >= 100) & (dist <= 200)
+    # Only flat, non-cliff tiles
+    flat = (tiles == SAND) | (tiles == SAND_DARK)
+    candidates = ring & flat
+
+    # Find the lowest-elevation spots in the ring as oasis centers
+    masked_elev = np.where(candidates, elev, 1.0)
+
+    # Use a deterministic hash to pick several oasis centers from the low spots
+    rng = np.random.RandomState(seed + 9999)
+    num_oases = rng.randint(4, 8)
+
+    # Find the lowest N% of tiles in the ring and sample centers from them
+    if not candidates.any():
+        return
+    threshold = np.percentile(masked_elev[candidates], 15)
+    low_spots = candidates & (elev <= threshold)
+    low_ys, low_xs = np.where(low_spots)
+    if len(low_ys) == 0:
+        return
+
+    # Pick oasis centers spread apart
+    centers = []
+    indices = rng.permutation(len(low_ys))
+    for idx in indices:
+        oy, ox = int(low_ys[idx]), int(low_xs[idx])
+        # Ensure minimum spacing of 40 tiles between oasis centers
+        too_close = False
+        for (py, px) in centers:
+            if abs(oy - py) + abs(ox - px) < 40:
+                too_close = True
+                break
+        if not too_close:
+            centers.append((oy, ox))
+            if len(centers) >= num_oases:
+                break
+
+    # Paint each oasis
+    for oy, ox in centers:
+        oasis_radius = rng.randint(8, 16)
+        water_radius = max(3, oasis_radius - 4)
+        deep_radius = max(1, water_radius - 2)
+
+        for dy in range(-oasis_radius, oasis_radius + 1):
+            for dx in range(-oasis_radius, oasis_radius + 1):
+                ty, tx = oy + dy, ox + dx
+                if ty < 0 or ty >= MAP_H or tx < 0 or tx >= MAP_W:
+                    continue
+                d = (dy * dy + dx * dx) ** 0.5
+                current = tiles[ty, tx]
+
+                # Skip cliffs
+                if current in (CLIFF, CLIFF_EDGE):
+                    continue
+
+                if d <= deep_radius:
+                    tiles[ty, tx] = WATER_DEEP
+                elif d <= water_radius:
+                    tiles[ty, tx] = WATER
+                elif d <= water_radius + 2:
+                    # Dense bush ring right around water
+                    h = (seed ^ (tx * 374761393) ^ (ty * 668265263)) % 1000
+                    if h < 333:
+                        tiles[ty, tx] = BUSH_GREEN
+                    elif h < 666:
+                        tiles[ty, tx] = BUSH_FLOWERING
+                    else:
+                        tiles[ty, tx] = BUSH_BERRY
+                elif d <= oasis_radius:
+                    # Sparse vegetation ring with palm trees
+                    h = (seed ^ (tx * 374761393) ^ (ty * 668265263)) % 100
+                    if h < 15:
+                        tiles[ty, tx] = PALM_TREE
+                    elif h < 25:
+                        bush_h = h % 3
+                        tiles[ty, tx] = [BUSH_GREEN, BUSH_FLOWERING, BUSH_BERRY][bush_h]
