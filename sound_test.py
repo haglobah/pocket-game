@@ -2,15 +2,14 @@ import pyxel
 
 
 RESOURCE_FILE = "sounds.pyxres"
-MELODY_BASS_TRACK_ID = 0
-DRUM_TRACK_ID = 2
+TRACK_ID = 0
 
 
 class App:
     def __init__(self):
         pyxel.init(200, 150, title="Pyxel Sound API")
         pyxel.load(RESOURCE_FILE, excl_images=True, excl_tilemaps=True)
-        self.melody_bass_channels = self._read_track_channels(MELODY_BASS_TRACK_ID)
+        self.track_channels = self._read_track_channels(TRACK_ID)
 
         pyxel.images[0].set(
             0,
@@ -54,14 +53,9 @@ class App:
     def play_music(self, ch0, ch1, ch2):
         pyxel.stop()
 
-        if ch0 and self.melody_bass_channels[0]:
-            pyxel.play(0, self.melody_bass_channels[0], loop=True)
-
-        if ch1 and self.melody_bass_channels[1]:
-            pyxel.play(1, self.melody_bass_channels[1], loop=True)
-
-        if ch2:
-            pyxel.playm(DRUM_TRACK_ID, loop=True)
+        for channel, enabled in enumerate((ch0, ch1, ch2)):
+            if enabled and self.track_channels[channel]:
+                pyxel.play(channel, self.track_channels[channel], loop=True)
 
     def update(self):
         if pyxel.btnp(pyxel.KEY_Q):
@@ -84,7 +78,7 @@ class App:
         pyxel.text(6, 6, "sounds loaded from sounds.pyxres", 7)
         pyxel.rect(12, 14, 177, 35, 2)
         pyxel.text(16, 17, "note  :[CDEFGAB] + [ #-] + [0-4] or [R]", 9)
-        pyxel.text(16, 25, "tone  :[T]riangle [S]quare [P]ulse [N]oise", 9)
+        pyxel.text(16, 25, "tone  :[T]rianngle [S]quare [P]ulse [N]oise", 9)
         pyxel.text(16, 33, "volume:[0-7]", 9)
         pyxel.text(16, 41, "effect:[N]one [S]lide [V]ibrato [F]adeOut", 9)
 
@@ -97,10 +91,10 @@ class App:
         pyxel.rect(6, 91, 29, 7, 14)
         pyxel.text(7, 92, "CONTROL", 1)
 
-        pyxel.text(12, 102, "1: Play melody+bass (track 0) + drums", 14)
-        pyxel.text(12, 110, "2: Play melody (track 0 ch0)", 14)
-        pyxel.text(12, 118, "3: Play bass (track 0 ch1)", 14)
-        pyxel.text(12, 126, "4: Play drums (track 2)", 14)
+        pyxel.text(12, 102, "1: Play all channels from track #0", 14)
+        pyxel.text(12, 110, "2: Play channel #0 (Melody)", 14)
+        pyxel.text(12, 118, "3: Play channel #1 (Bass)", 14)
+        pyxel.text(12, 126, "4: Play channel #2 (Drums)", 14)
         pyxel.text(12, 134, "5: Stop playing", 14)
 
         pyxel.text(137, 107, "play_pos(ch)", 15)
