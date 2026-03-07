@@ -163,7 +163,7 @@ Each ability is learned through a trial with deadly choices and skill-based clue
 
 - [ ] Diagonal movement (hold two directions at once)
 - [ ] Save game?
-- [ ] Make text bigger
+- [x] Make text bigger
 
 # Art Style
 

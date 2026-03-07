@@ -1,4 +1,5 @@
 import pyxel
+from pathlib import Path
 
 from .constants import (
     SCREEN_W, SCREEN_H, TILE_SIZE, VIEWPORT_W, VIEWPORT_H, DEBUG_HEIGHT,
@@ -9,6 +10,36 @@ from .constants import (
     THOUGHT_CHAR_SPEED,
 )
 from .model import Model, ThoughtBubble
+
+
+_TITLE_FONT = None
+_UI_FONT = None
+
+
+def _load_ui_font(filename: str, size: float):
+    """Load a UI font from the installed pyxel package; fallback to default font if unavailable."""
+    try:
+        pyxel_dir = Path(pyxel.__file__).resolve().parent
+        font_path = pyxel_dir / "examples" / "assets" / filename
+        if font_path.exists():
+            return pyxel.Font(str(font_path), size)
+    except Exception:
+        pass
+    return None
+
+
+def _get_title_font():
+    global _TITLE_FONT
+    if _TITLE_FONT is None:
+        _TITLE_FONT = _load_ui_font("PixelMplus12-Regular.ttf", 40)
+    return _TITLE_FONT
+
+
+def _get_ui_font():
+    global _UI_FONT
+    if _UI_FONT is None:
+        _UI_FONT = _load_ui_font("PixelMplus12-Regular.ttf", 24)
+    return _UI_FONT
 
 
 def draw_tile(sx: int, sy: int, tile: int, frame: int):
@@ -46,61 +77,62 @@ def view(model: Model):
 
 def view_title(model: Model):
     pyxel.cls(1)
+    title_font = _get_title_font()
+    ui_font = _get_ui_font()
+
     # Title
     title = "POCKET WORLD"
-    tx = (SCREEN_W - len(title) * pyxel.FONT_WIDTH) // 2
-    pyxel.text(tx, 280, title, 7)
+    _center_text(260, title, 7, title_font)
 
     # Seed input
     prompt = "Enter seed (or press ENTER for random):"
-    px = (SCREEN_W - len(prompt) * pyxel.FONT_WIDTH) // 2
-    pyxel.text(px, 340, prompt, 13)
+    _center_text(320, prompt, 13, ui_font)
 
     input_text = model.seed_input + ("_" if (model.frame // 20) % 2 == 0 else " ")
-    ix = (SCREEN_W - len(input_text) * pyxel.FONT_WIDTH) // 2
-    pyxel.text(ix, 360, input_text, 7)
+    _center_text(350, input_text, 7, ui_font)
 
     hint = "[ENTER] Start"
-    hx = (SCREEN_W - len(hint) * pyxel.FONT_WIDTH) // 2
-    pyxel.text(hx, 400, hint, 6)
+    _center_text(390, hint, 6, ui_font)
 
     # Draw the character as preview
     draw_character(SCREEN_W // 2 - 16, 210, DOWN, model.frame)
 
 
-def _center_text(y: int, text: str, col: int):
+def _center_text(y: int, text: str, col: int, font=None):
     """Draw text centered horizontally."""
-    x = (SCREEN_W - len(text) * pyxel.FONT_WIDTH) // 2
-    pyxel.text(x, y, text, col)
+    width = font.text_width(text) if font else len(text) * pyxel.FONT_WIDTH
+    x = (SCREEN_W - width) // 2
+    pyxel.text(x, y, text, col, font)
 
 
 def view_death(model: Model):
     pyxel.cls(0)
+    ui_font = _get_ui_font()
     y = 120
 
-    _center_text(y, f"Cycle {model.cycle} -- You died", 8)
-    y += 30
+    _center_text(y, f"Cycle {model.cycle} -- You died", 8, ui_font)
+    y += 36
 
-    _center_text(y, f"Seed: {model.seed}", 13)
-    y += 20
+    _center_text(y, f"Seed: {model.seed}", 13, ui_font)
+    y += 26
 
-    _center_text(y, f"Reason: {model.death_reason}", 8)
-    y += 40
+    _center_text(y, f"Reason: {model.death_reason}", 8, ui_font)
+    y += 42
 
     if model.learned:
-        _center_text(y, "In this cycle, you learned:", 7)
-        y += 16
+        _center_text(y, "In this cycle, you learned:", 7, ui_font)
+        y += 22
         for skill in model.learned:
-            _center_text(y, f"- {skill}", 11)
-            y += 12
+            _center_text(y, f"- {skill}", 11, ui_font)
+            y += 18
     else:
-        _center_text(y, "You didn't learn anything this cycle.", 13)
+        _center_text(y, "You didn't learn anything this cycle.", 13, ui_font)
     y += 30
 
     if model.death_timer >= DEATH_SCREEN_MIN_FRAMES:
         blink = (model.death_timer // 30) % 2 == 0
         if blink:
-            _center_text(y, "[ENTER] Continue", 7)
+            _center_text(y, "[ENTER] Continue", 7, ui_font)
 
 
 def _draw_hourglass(cx: int, cy: int, fill_frac: float):
