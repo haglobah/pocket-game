@@ -27,8 +27,14 @@ TEXT_DEATH = ["GAME OVER", "(Q)UIT", "(R)ESTART"]
 COL_TEXT_DEATH = 0
 HEIGHT_DEATH = 5
 
-WIDTH = 40
-HEIGHT = 50
+GRID_W = 40
+GRID_H = 50
+SCALE = 4
+
+SCREEN_W = GRID_W * SCALE
+SCREEN_H = GRID_H * SCALE
+DEBUG_HEIGHT = 50
+TOTAL_HEIGHT = SCREEN_H + DEBUG_HEIGHT
 
 HEIGHT_SCORE = pyxel.FONT_HEIGHT
 COL_SCORE = 6
@@ -132,6 +138,7 @@ class GenerateApple(Cmd):
 ################
 
 OPPOSITE = {UP: DOWN, DOWN: UP, LEFT: RIGHT, RIGHT: LEFT}
+DIR_NAME = {UP: "UP", DOWN: "DOWN", LEFT: "LEFT", RIGHT: "RIGHT"}
 
 
 def init() -> tuple[Model, list[Cmd]]:
@@ -177,8 +184,8 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             dead = (
                 new_head.x < 0
                 or new_head.y < HEIGHT_SCORE
-                or new_head.x >= WIDTH
-                or new_head.y >= HEIGHT
+                or new_head.x >= GRID_W
+                or new_head.y >= GRID_H
                 or new_head in new_snake[1:]
             )
             if dead:
@@ -263,8 +270,8 @@ def interpret_cmd(cmd: Cmd) -> list[Msg]:
             snake_pixels = set(snake)
             pos = snake[0]
             while pos in snake_pixels:
-                x = pyxel.rndi(0, WIDTH - 1)
-                y = pyxel.rndi(HEIGHT_SCORE + 1, HEIGHT - 1)
+                x = pyxel.rndi(0, GRID_W - 1)
+                y = pyxel.rndi(HEIGHT_SCORE + 1, GRID_H - 1)
                 pos = Point(x, y)
             return [AppleGenerated(position=pos)]
     return []
@@ -280,27 +287,52 @@ def center_text(text, page_width, char_width=pyxel.FONT_WIDTH):
     return (page_width - text_width) // 2
 
 
+def draw_cell(x, y, col):
+    """Draw a single game-grid cell as a scaled rect."""
+    pyxel.rect(x * SCALE, y * SCALE, SCALE, SCALE, col)
+
+
 def view(model: Model):
     if not model.death:
         pyxel.cls(col=COL_BACKGROUND)
         # Draw snake
         for i, point in enumerate(model.snake):
             colour = COL_HEAD if i == 0 else COL_BODY
-            pyxel.pset(point.x, point.y, col=colour)
-        # Draw score
+            draw_cell(point.x, point.y, colour)
+        # Draw score bar
         score = f"{model.score:04}"
-        pyxel.rect(0, 0, WIDTH, HEIGHT_SCORE, COL_SCORE_BACKGROUND)
-        pyxel.text(1, 1, score, COL_SCORE)
+        pyxel.rect(0, 0, SCREEN_W, HEIGHT_SCORE * SCALE, COL_SCORE_BACKGROUND)
+        pyxel.text(2, 2, score, COL_SCORE)
         # Draw apple
-        pyxel.pset(model.apple.x, model.apple.y, col=COL_APPLE)
+        draw_cell(model.apple.x, model.apple.y, COL_APPLE)
     else:
         pyxel.cls(col=COL_DEATH)
         display_text = TEXT_DEATH[:]
         display_text.insert(1, f"{model.score:04}")
         for i, text in enumerate(display_text):
             y_offset = (pyxel.FONT_HEIGHT + 2) * i
-            text_x = center_text(text, WIDTH)
+            text_x = center_text(text, SCREEN_W)
             pyxel.text(text_x, HEIGHT_DEATH + y_offset, text, COL_TEXT_DEATH)
+
+    # Debug overlay
+    draw_debug(model)
+
+
+def draw_debug(model: Model):
+    y = SCREEN_H + 2
+    pyxel.rect(0, SCREEN_H, SCREEN_W, DEBUG_HEIGHT, 0)
+    head = model.snake[0]
+    lines = [
+        f"dir:{DIR_NAME.get(model.direction, '?')}",
+        f"head:({head.x},{head.y})",
+        f"len:{len(model.snake)}",
+        f"apple:({model.apple.x},{model.apple.y})",
+        f"score:{model.score}",
+        f"death:{model.death}",
+    ]
+    for line in lines:
+        pyxel.text(1, y, line, 7)
+        y += pyxel.FONT_HEIGHT + 1
 
 
 ###############
@@ -311,7 +343,7 @@ def view(model: Model):
 class App:
     def __init__(self):
         pyxel.init(
-            WIDTH, HEIGHT, title="Snake!", fps=20, display_scale=12, capture_scale=6
+            SCREEN_W, TOTAL_HEIGHT, title="Snake!", fps=20, display_scale=3, capture_scale=2
         )
         define_sound_and_music()
         self.model, cmds = init()
