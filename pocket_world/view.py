@@ -14,6 +14,7 @@ from .model import Model, ThoughtBubble
 
 _TITLE_FONT = None
 _UI_FONT = None
+_HUD_FONT = None
 
 
 def _load_ui_font(filename: str, size: float):
@@ -40,6 +41,13 @@ def _get_ui_font():
     if _UI_FONT is None:
         _UI_FONT = _load_ui_font("PixelMplus12-Regular.ttf", 24)
     return _UI_FONT
+
+
+def _get_hud_font():
+    global _HUD_FONT
+    if _HUD_FONT is None:
+        _HUD_FONT = _load_ui_font("PixelMplus12-Regular.ttf", 16)
+    return _HUD_FONT
 
 
 def draw_tile(sx: int, sy: int, tile: int, frame: int):
@@ -286,8 +294,9 @@ def view_play(model: Model):
     # Show bar unless lungs mode on land with full O2
     show_o2 = not (can_auto_breathe and model.o2 >= O2_MAX)
     if show_o2:
-        bar_w = 100
-        bar_h = 8
+        hud_font = _get_hud_font()
+        bar_w = 140
+        bar_h = 12
         bar_x = (SCREEN_W - bar_w) // 2
         bar_y = 10
         o2_frac = model.o2 / O2_MAX
@@ -298,7 +307,7 @@ def view_play(model: Model):
         pyxel.rect(bar_x, bar_y, int(bar_w * o2_frac), bar_h, fill_color)
         # Label
         mode_label = "LUNGS" if model.breathing_mode == LUNGS else "GILLS"
-        pyxel.text(bar_x + bar_w + 4, bar_y, f"O2 [{mode_label}]", 7)
+        pyxel.text(bar_x + bar_w + 8, bar_y - 1, f"O2 [{mode_label}]", 7, hud_font)
 
     # Debug panel below map
     map_bottom = VIEWPORT_H * TILE_SIZE
