@@ -6,6 +6,7 @@ from .constants import (
     MAP_W, MAP_H,
     WATER, GRASS, TALL_GRASS, FLOWERS, DIRT, SAND, TREE, ROCK, BUSH,
     UP, DOWN, LEFT, RIGHT,
+    UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT, DIR_NAME,
     LUNGS, O2_MAX, DEATH_SCREEN_MIN_FRAMES, REWIND_DURATION,
     THOUGHT_CHAR_SPEED,
 )
@@ -77,7 +78,16 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
 def draw_character(sx: int, sy: int, facing, frame: int):
     """Draw a creature sprite at screen pixel position (32x32), using sprites."""
     walk_bob = (frame // 6) % 2
-    dir_idx = {DOWN: 0, UP: 1, LEFT: 2, RIGHT: 3}[facing]
+    dir_idx = {
+        DOWN: 0,
+        DOWN_LEFT: 0,
+        DOWN_RIGHT: 0,
+        UP: 1,
+        UP_LEFT: 1,
+        UP_RIGHT: 1,
+        LEFT: 2,
+        RIGHT: 3,
+    }.get(facing, 0)
     u = (dir_idx * 2 + walk_bob) * 32
     pyxel.blt(sx, sy, 0, u, 64, 32, 32, 2)  # colkey=2 for transparency
 
@@ -344,7 +354,6 @@ def view_play(model: Model):
     # Debug panel below map
     map_bottom = VIEWPORT_H * TILE_SIZE
     pyxel.rect(0, map_bottom, SCREEN_W, DEBUG_HEIGHT, 0)
-    dir_name = {UP: "UP", DOWN: "DOWN", LEFT: "LEFT", RIGHT: "RIGHT"}
     tile_name = {
         GRASS: "grass", TALL_GRASS: "tall_grass", FLOWERS: "flowers",
         DIRT: "dirt", WATER: "water", SAND: "sand",
@@ -354,7 +363,7 @@ def view_play(model: Model):
     y = map_bottom + 2
     lines = [
         f"seed:{model.seed}  state:{model.state}",
-        f"pos:({px},{py})  facing:{dir_name.get(model.facing, '?')}  tile:{standing_on}",
+        f"pos:({px},{py})  facing:{DIR_NAME.get(model.facing, '?')}  tile:{standing_on}",
         f"move_timer:{model.move_timer}  frame:{model.frame}",
         f"map:{MAP_W}x{MAP_H}  o2:{model.o2 // 60}s  mode:{model.breathing_mode}",
     ]

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pyxel
 
-from .constants import SCREEN_W, SCREEN_H, UP, DOWN, LEFT, RIGHT
+from .constants import SCREEN_W, SCREEN_H, Point
 from .messages import (
     Msg, Tick, MoveDir, StartGame, TypeChar, Backspace, MapGenerated,
     Breathe, ToggleBreathingMode, DismissDeathScreen, RewindTick,
@@ -86,14 +86,18 @@ class App:
                 msgs.append(StartGame(seed=seed))
 
         elif self.model.state == "play":
+            dx = 0
+            dy = 0
+            if pyxel.btn(pyxel.KEY_LEFT) or pyxel.btn(pyxel.KEY_A):
+                dx -= 1
+            if pyxel.btn(pyxel.KEY_RIGHT) or pyxel.btn(pyxel.KEY_D):
+                dx += 1
             if pyxel.btn(pyxel.KEY_UP) or pyxel.btn(pyxel.KEY_W):
-                msgs.append(MoveDir(direction=UP))
-            elif pyxel.btn(pyxel.KEY_DOWN) or pyxel.btn(pyxel.KEY_S):
-                msgs.append(MoveDir(direction=DOWN))
-            elif pyxel.btn(pyxel.KEY_LEFT) or pyxel.btn(pyxel.KEY_A):
-                msgs.append(MoveDir(direction=LEFT))
-            elif pyxel.btn(pyxel.KEY_RIGHT) or pyxel.btn(pyxel.KEY_D):
-                msgs.append(MoveDir(direction=RIGHT))
+                dy -= 1
+            if pyxel.btn(pyxel.KEY_DOWN) or pyxel.btn(pyxel.KEY_S):
+                dy += 1
+            if dx != 0 or dy != 0:
+                msgs.append(MoveDir(direction=Point(dx, dy)))
             if pyxel.btnp(pyxel.KEY_SPACE):
                 msgs.append(Breathe())
             if pyxel.btnp(pyxel.KEY_B):

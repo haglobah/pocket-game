@@ -58,3 +58,20 @@ UP = Point(0, -1)
 DOWN = Point(0, 1)
 LEFT = Point(-1, 0)
 RIGHT = Point(1, 0)
+
+# Diagonals
+UP_LEFT = Point(-1, -1)
+UP_RIGHT = Point(1, -1)
+DOWN_LEFT = Point(-1, 1)
+DOWN_RIGHT = Point(1, 1)
+
+DIR_NAME = {
+    UP: "UP",
+    DOWN: "DOWN",
+    LEFT: "LEFT",
+    RIGHT: "RIGHT",
+    UP_LEFT: "UP_LEFT",
+    UP_RIGHT: "UP_RIGHT",
+    DOWN_LEFT: "DOWN_LEFT",
+    DOWN_RIGHT: "DOWN_RIGHT",
+}
