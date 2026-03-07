@@ -44,6 +44,15 @@ MOVE_DELAY_WATER = 12
 MOVE_DELAY_LAND = 8
 MOVE_DELAY_RUNNING = 4
 
+# O2 system
+O2_MAX = 40 * 60  # 40 seconds at 60fps
+O2_BREATHE_REFILL = 20 * 60  # 20 seconds refill per key press
+O2_AUTO_REFILL_RATE = 4  # frames of O2 restored per frame when auto-breathing
+
+# Breathing modes
+LUNGS = "lungs"
+GILLS = "gills"
+
 # Directions
 UP = Point(0, -1)
 DOWN = Point(0, 1)
@@ -139,6 +148,8 @@ class Model:
     state: str  # "title" | "play"
     seed_input: str  # text input on title screen
     frame: int  # animation frame counter
+    o2: int  # O2 in frames remaining (max O2_MAX)
+    breathing_mode: str  # LUNGS or GILLS
 
 
 ##############
@@ -182,6 +193,16 @@ class MapGenerated(Msg):
     seed: int
 
 
+@dataclass(frozen=True)
+class Breathe(Msg):
+    pass
+
+
+@dataclass(frozen=True)
+class ToggleBreathingMode(Msg):
+    pass
+
+
 ##############
 # Commands   #
 ##############
@@ -221,6 +242,8 @@ def init() -> tuple[Model, list[Cmd]]:
         state="title",
         seed_input="",
         frame=0,
+        o2=O2_MAX,
+        breathing_mode=LUNGS,
     )
     return model, []
 
@@ -244,10 +267,19 @@ def _find_spawn(tilemap: tuple[tuple[int, ...], ...]) -> Point:
 def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
     match msg:
         case Tick():
+            new_o2 = model.o2
+            if model.state == "play" and model.tilemap:
+                underwater = model.tilemap[model.player_pos.y][model.player_pos.x] == WATER
+                can_auto_breathe = (model.breathing_mode == LUNGS and not underwater)
+                if can_auto_breathe:
+                    new_o2 = min(O2_MAX, new_o2 + O2_AUTO_REFILL_RATE)
+                else:
+                    new_o2 = max(0, new_o2 - 1)
             return replace(
                 model,
                 move_timer=max(0, model.move_timer - 1),
                 frame=model.frame + 1,
+                o2=new_o2,
             ), []
 
         case MoveDir(direction=d):
@@ -291,6 +323,19 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             if model.state == "title" and model.seed_input:
                 return replace(model, seed_input=model.seed_input[:-1]), []
             return model, []
+
+        case Breathe():
+            if model.state != "play" or not model.tilemap:
+                return model, []
+            underwater = model.tilemap[model.player_pos.y][model.player_pos.x] == WATER
+            if model.breathing_mode == GILLS and underwater:
+                new_o2 = min(O2_MAX, model.o2 + O2_BREATHE_REFILL)
+                return replace(model, o2=new_o2), []
+            return model, []
+
+        case ToggleBreathingMode():
+            new_mode = GILLS if model.breathing_mode == LUNGS else LUNGS
+            return replace(model, breathing_mode=new_mode), []
 
     return model, []
 
@@ -396,6 +441,26 @@ def view_play(model: Model):
     pcy = (VIEWPORT_H // 2) * TILE_SIZE
     draw_character(pcx, pcy, model.facing, model.frame)
 
+    # O2 bar
+    underwater = model.tilemap[py][px] == WATER
+    can_auto_breathe = (model.breathing_mode == LUNGS and not underwater)
+    # Show bar unless lungs mode on land with full O2
+    show_o2 = not (can_auto_breathe and model.o2 >= O2_MAX)
+    if show_o2:
+        bar_w = 100
+        bar_h = 8
+        bar_x = (SCREEN_W - bar_w) // 2
+        bar_y = 10
+        o2_frac = model.o2 / O2_MAX
+        # Background
+        pyxel.rect(bar_x - 1, bar_y - 1, bar_w + 2, bar_h + 2, 0)
+        # Fill — color based on level
+        fill_color = 11 if o2_frac > 0.5 else (9 if o2_frac > 0.25 else 8)
+        pyxel.rect(bar_x, bar_y, int(bar_w * o2_frac), bar_h, fill_color)
+        # Label
+        mode_label = "LUNGS" if model.breathing_mode == LUNGS else "GILLS"
+        pyxel.text(bar_x + bar_w + 4, bar_y, f"O2 [{mode_label}]", 7)
+
     # Debug panel below map
     map_bottom = VIEWPORT_H * TILE_SIZE
     pyxel.rect(0, map_bottom, SCREEN_W, DEBUG_HEIGHT, 0)
@@ -411,7 +476,7 @@ def view_play(model: Model):
         f"seed:{model.seed}  state:{model.state}",
         f"pos:({px},{py})  facing:{dir_name.get(model.facing, '?')}  tile:{standing_on}",
         f"move_timer:{model.move_timer}  frame:{model.frame}",
-        f"map:{MAP_W}x{MAP_H}  seed_input:\"{model.seed_input}\"",
+        f"map:{MAP_W}x{MAP_H}  o2:{model.o2 // 60}s  mode:{model.breathing_mode}",
     ]
     for line in lines:
         pyxel.text(2, y, line, 7)
@@ -468,6 +533,10 @@ class App:
                 msgs.append(MoveDir(direction=LEFT))
             elif pyxel.btn(pyxel.KEY_RIGHT) or pyxel.btn(pyxel.KEY_D):
                 msgs.append(MoveDir(direction=RIGHT))
+            if pyxel.btnp(pyxel.KEY_SPACE):
+                msgs.append(Breathe())
+            if pyxel.btnp(pyxel.KEY_B):
+                msgs.append(ToggleBreathingMode())
 
         msgs.append(Tick())
         return msgs
