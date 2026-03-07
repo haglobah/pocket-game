@@ -19,3 +19,8 @@ class PlayStepSound(Cmd):
 @dataclass(frozen=True)
 class PlaySwimSound(Cmd):
     pass
+
+
+@dataclass(frozen=True)
+class PlayThoughtSound(Cmd):
+    pass

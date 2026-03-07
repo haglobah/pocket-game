@@ -4,6 +4,14 @@ from .constants import Point
 
 
 @dataclass(frozen=True)
+class ThoughtBubble:
+    memory_id: str
+    text: str
+    timer: int
+    duration: int
+
+
+@dataclass(frozen=True)
 class Model:
     player_pos: Point
     facing: Point
@@ -20,3 +28,6 @@ class Model:
     learned: tuple[str, ...]  # skills learned this cycle
     death_timer: int  # frames spent on death screen
     rewind_timer: int  # frames remaining in rewind animation
+    thought: ThoughtBubble | None
+    seen_memories: tuple[str, ...]
+    thought_cooldown: int

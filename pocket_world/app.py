@@ -8,7 +8,7 @@ from .messages import (
     Msg, Tick, MoveDir, StartGame, TypeChar, Backspace, MapGenerated,
     Breathe, ToggleBreathingMode, DismissDeathScreen, RewindTick,
 )
-from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound
+from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound
 from .mapgen import generate_map
 from .update import init, update
 from .view import view
@@ -29,6 +29,8 @@ def interpret_cmd(cmd: Cmd) -> list[Msg]:
             pyxel.play(3, 0)
         case PlaySwimSound():
             pyxel.play(3, 0)
+        case PlayThoughtSound():
+            pyxel.play(2, 1)
     return []
 
 
@@ -40,6 +42,14 @@ def define_sounds():
         volumes="2",
         effects="f",
         speed=5,
+    )
+    # Thought bubble chime — gentle ascending two-note
+    pyxel.sounds[1].set(
+        notes="e3g3",
+        tones="s",
+        volumes="32",
+        effects="f",
+        speed=10,
     )
 
 

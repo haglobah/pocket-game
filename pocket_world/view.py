@@ -6,8 +6,9 @@ from .constants import (
     WATER, GRASS, TALL_GRASS, FLOWERS, DIRT, SAND, TREE, ROCK, BUSH,
     UP, DOWN, LEFT, RIGHT,
     LUNGS, O2_MAX, DEATH_SCREEN_MIN_FRAMES, REWIND_DURATION,
+    THOUGHT_CHAR_SPEED,
 )
-from .model import Model
+from .model import Model, ThoughtBubble
 
 
 def draw_tile(sx: int, sy: int, tile: int, frame: int):
@@ -147,6 +148,75 @@ def view_rewind(model: Model):
     _center_text(SCREEN_H // 2 + 70, f"Cycle {model.cycle + 1}", 13)
 
 
+def _wrap_text(text: str, max_chars: int) -> list[str]:
+    """Word-wrap text into lines of at most max_chars characters."""
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        if current and len(current) + 1 + len(word) > max_chars:
+            lines.append(current)
+            current = word
+        else:
+            current = f"{current} {word}" if current else word
+    if current:
+        lines.append(current)
+    return lines
+
+
+def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
+    """Draw a thought bubble centered at cx with tail ending at bottom_y."""
+    chars_shown = min(len(thought.text), thought.timer // THOUGHT_CHAR_SPEED)
+    display_text = thought.text[:chars_shown]
+    if not display_text:
+        return
+
+    lines = _wrap_text(display_text, 28)
+    fw = pyxel.FONT_WIDTH
+    fh = pyxel.FONT_HEIGHT
+    line_h = fh + 2
+
+    text_w = max(len(line) for line in lines) * fw
+    text_h = len(lines) * line_h - 2
+
+    pad_x, pad_y = 8, 6
+    bw = text_w + pad_x * 2
+    bh = text_h + pad_y * 2
+    bx = cx - bw // 2
+    by = bottom_y - bh - 16
+
+    # Clamp to screen edges
+    bx = max(2, min(bx, SCREEN_W - bw - 2))
+
+    # Rounded rectangle — fill
+    pyxel.rect(bx + 2, by + 1, bw - 4, bh - 2, 7)
+    pyxel.rect(bx + 1, by + 2, bw - 2, bh - 4, 7)
+
+    # Border
+    pyxel.line(bx + 2, by, bx + bw - 3, by, 5)
+    pyxel.line(bx + 2, by + bh - 1, bx + bw - 3, by + bh - 1, 5)
+    pyxel.line(bx, by + 2, bx, by + bh - 3, 5)
+    pyxel.line(bx + bw - 1, by + 2, bx + bw - 1, by + bh - 3, 5)
+    pyxel.pset(bx + 1, by + 1, 5)
+    pyxel.pset(bx + bw - 2, by + 1, 5)
+    pyxel.pset(bx + 1, by + bh - 2, 5)
+    pyxel.pset(bx + bw - 2, by + bh - 2, 5)
+
+    # Tail dots (thought bubble style — two small circles leading to player)
+    dot_x = cx
+    pyxel.circ(dot_x - 2, by + bh + 4, 3, 7)
+    pyxel.circb(dot_x - 2, by + bh + 4, 3, 5)
+    pyxel.circ(dot_x + 2, by + bh + 10, 2, 7)
+    pyxel.circb(dot_x + 2, by + bh + 10, 2, 5)
+
+    # Text
+    ty = by + pad_y
+    for line in lines:
+        lx = bx + pad_x
+        pyxel.text(lx, ty, line, 1)
+        ty += line_h
+
+
 def view_play(model: Model):
     pyxel.cls(0)
     px, py = model.player_pos
@@ -163,7 +233,6 @@ def view_play(model: Model):
             ty = (cam_y + sy) % MAP_H
             tile = model.tilemap[ty][tx]
             if underwater and tile != WATER:
-                # Can't see above-water tiles when submerged
                 pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 1)
             else:
                 draw_tile(sx * TILE_SIZE, sy * TILE_SIZE, tile, model.frame)
@@ -172,6 +241,12 @@ def view_play(model: Model):
     pcx = (VIEWPORT_W // 2) * TILE_SIZE
     pcy = (VIEWPORT_H // 2) * TILE_SIZE
     draw_character(pcx, pcy, model.facing, model.frame)
+
+    # Thought bubble above player
+    if model.thought is not None:
+        player_cx = pcx + TILE_SIZE // 2
+        player_top = pcy
+        _draw_thought_bubble(player_cx, player_top - 6, model.thought)
 
     # O2 bar
     underwater = model.tilemap[py][px] == WATER
