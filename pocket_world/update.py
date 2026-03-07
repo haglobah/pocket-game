@@ -56,6 +56,7 @@ from .thoughts import check_triggers, get_memory
 def init() -> tuple[Model, list[Cmd]]:
     model = Model(
         player_pos=Point(MAP_W // 2, MAP_H // 2),
+        spawn_pos=Point(MAP_W // 2, MAP_H // 2),
         facing=DOWN,
         tilemap=(),
         seed=0,
@@ -65,6 +66,8 @@ def init() -> tuple[Model, list[Cmd]]:
         frame=0,
         o2=O2_MAX,
         breathing_mode=GILLS,
+        hydration=HYDRATION_MAX,
+        hunger=HUNGER_MAX,
         cycle=1,
         death_reason="",
         learned=(),
@@ -73,6 +76,7 @@ def init() -> tuple[Model, list[Cmd]]:
         thought=None,
         seen_memories=(),
         thought_cooldown=0,
+        show_minimap=False,
     )
     return model, []
 
@@ -254,6 +258,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             return replace(
                 model,
                 player_pos=spawn,
+                spawn_pos=spawn,
                 tilemap=tm,
                 seed=s,
                 state="play",

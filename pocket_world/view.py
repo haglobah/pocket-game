@@ -49,8 +49,17 @@ _TITLE_FONT = None
 _UI_FONT = None
 _HUD_FONT = None
 _THOUGHT_FONT = None
+_SPACESHIP_IMAGE = None
 
 _THOUGHT_FONT_SIZE = 16
+
+SPACESHIP_SCALE = 1.0
+
+
+def set_spaceship_image(image):
+    """Set externally loaded spaceship image used at spawn zone."""
+    global _SPACESHIP_IMAGE
+    _SPACESHIP_IMAGE = image
 
 
 def _load_ui_font(filename: str, size: float):
@@ -459,6 +468,37 @@ def _draw_minimap(model: Model):
     )
 
 
+def _draw_spawn_spaceship(model: Model, cam_x: int, cam_y: int):
+    """Draw the spaceship image centered on the spawn tile."""
+    if _SPACESHIP_IMAGE is None:
+        return
+
+    src_w = _SPACESHIP_IMAGE.width
+    src_h = _SPACESHIP_IMAGE.height
+    draw_w = int(src_w * SPACESHIP_SCALE)
+    draw_h = int(src_h * SPACESHIP_SCALE)
+
+    spawn_world_x = model.spawn_pos.x * TILE_SIZE + TILE_SIZE // 2
+    spawn_world_y = model.spawn_pos.y * TILE_SIZE + TILE_SIZE // 2
+
+    sx = spawn_world_x - cam_x * TILE_SIZE - draw_w // 2
+    sy = spawn_world_y - cam_y * TILE_SIZE - draw_h // 2
+
+    if sx > SCREEN_W or sy > VIEWPORT_H * TILE_SIZE or sx + draw_w < 0 or sy + draw_h < 0:
+        return
+
+    pyxel.blt(
+        sx,
+        sy,
+        _SPACESHIP_IMAGE,
+        0,
+        0,
+        src_w,
+        src_h,
+        scale=SPACESHIP_SCALE,
+    )
+
+
 def view_play(model: Model):
     pyxel.cls(0)
     px, py = model.player_pos
@@ -481,6 +521,8 @@ def view_play(model: Model):
                 pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 1)
             else:
                 draw_tile(sx * TILE_SIZE, sy * TILE_SIZE, tile, model.frame)
+
+    _draw_spawn_spaceship(model, cam_x, cam_y)
 
     # Draw player at center of screen
     pcx = (VIEWPORT_W // 2) * TILE_SIZE

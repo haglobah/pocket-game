@@ -23,10 +23,11 @@ from .messages import (
 from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound
 from .mapgen import generate_map
 from .update import update
-from .view import view
+from .view import view, set_spaceship_image
 from .model import init
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_SPACESHIP_IMAGE_PATH = _PROJECT_ROOT / "assets" / "art" / "spaceship-small-top.png"
 
 # Characters that can be typed for seed input
 TYPEABLE = "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -66,6 +67,13 @@ def define_sounds():
     )
 
 
+def load_world_art():
+    """Load spaceship sprite used in the spawn zone."""
+    set_spaceship_image(None)
+    if _SPACESHIP_IMAGE_PATH.exists():
+        set_spaceship_image(pyxel.Image.from_image(str(_SPACESHIP_IMAGE_PATH)))
+
+
 class App:
     def __init__(self):
         pyxel.init(
@@ -81,6 +89,7 @@ class App:
             exclude_musics=True,
             exclude_tilemaps=True,
         )
+        load_world_art()
         define_sounds()
         self.model, cmds = init()
         self._process_cmds(cmds)

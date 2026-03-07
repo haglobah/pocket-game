@@ -24,6 +24,7 @@ class ThoughtBubble:
 @dataclass(frozen=True)
 class Model:
     player_pos: Point
+    spawn_pos: Point
     facing: Point
     tilemap: tuple[tuple[int, ...], ...]
     seed: int
@@ -49,6 +50,7 @@ class Model:
 def init() -> tuple[Model, list[Cmd]]:
     model = Model(
         player_pos=Point(MAP_W // 2, MAP_H // 2),
+        spawn_pos=Point(MAP_W // 2, MAP_H // 2),
         facing=DOWN,
         tilemap=(),
         seed=0,
