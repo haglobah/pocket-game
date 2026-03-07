@@ -73,8 +73,8 @@ LUNGS = "lungs"
 GILLS = "gills"
 
 # Thought bubbles
-THOUGHT_CHAR_SPEED = 3       # frames per character (typing effect)
-THOUGHT_READ_FRAMES = 180    # hold full text for 3 seconds
+THOUGHT_CHAR_SPEED = 3  # frames per character (typing effect)
+THOUGHT_READ_FRAMES = 180  # hold full text for 3 seconds
 THOUGHT_COOLDOWN_FRAMES = 600  # 10 seconds between thoughts
 THOUGHT_INITIAL_DELAY = 180  # 3 seconds before first thought after spawn
 

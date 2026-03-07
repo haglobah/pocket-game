@@ -29,7 +29,11 @@ from .constants import (
     DOWN,
     LEFT,
     RIGHT,
-    UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT, DIR_NAME,
+    UP_LEFT,
+    UP_RIGHT,
+    DOWN_LEFT,
+    DOWN_RIGHT,
+    DIR_NAME,
     LUNGS,
     O2_MAX,
     HYDRATION_MAX,
@@ -87,6 +91,7 @@ def _get_thought_font():
     if _THOUGHT_FONT is None:
         _THOUGHT_FONT = _load_ui_font("PixelMplus12-Regular.ttf", _THOUGHT_FONT_SIZE)
     return _THOUGHT_FONT
+
 
 # Minimap: 1 pixel per 8 tiles → 250x125 pixels
 MINIMAP_SCALE = 8
@@ -415,6 +420,8 @@ def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
         lx = bx + pad_x
         pyxel.text(lx, ty, line, 1, thought_font)
         ty += line_h
+
+
 def _ensure_minimap(model: Model):
     """Write minimap to image bank 2 if not already cached for this seed."""
     global _minimap_cache_seed
@@ -447,7 +454,9 @@ def _draw_minimap(model: Model):
     dot_col = 8 if (model.frame // 15) % 2 == 0 else 7
     pyxel.rect(mx + px - 1, my + py - 1, 3, 3, dot_col)
     # Label
-    pyxel.text(mx + MINIMAP_W - len("[M] Map") * pyxel.FONT_WIDTH, my - 10, "[M] Map", 7)
+    pyxel.text(
+        mx + MINIMAP_W - len("[M] Map") * pyxel.FONT_WIDTH, my - 10, "[M] Map", 7
+    )
 
 
 def view_play(model: Model):
@@ -490,7 +499,9 @@ def view_play(model: Model):
     bar_x = 10
     bar_y = 10
 
-    def _draw_bar(y: int, frac: float, label: str, full_col: int, mid_col: int, low_col: int):
+    def _draw_bar(
+        y: int, frac: float, label: str, full_col: int, mid_col: int, low_col: int
+    ):
         col = full_col if frac > 0.5 else (mid_col if frac > 0.25 else low_col)
         pyxel.rect(bar_x - 1, y - 1, bar_w + 2, bar_h + 2, 0)
         pyxel.rect(bar_x, y, int(bar_w * frac), bar_h, col)

@@ -16,8 +16,10 @@ from .constants import (
     MOVE_DELAY_WATER,
     DEATH_SCREEN_MIN_FRAMES,
     REWIND_DURATION,
-    THOUGHT_CHAR_SPEED, THOUGHT_READ_FRAMES,
-    THOUGHT_COOLDOWN_FRAMES, THOUGHT_INITIAL_DELAY,
+    THOUGHT_CHAR_SPEED,
+    THOUGHT_READ_FRAMES,
+    THOUGHT_COOLDOWN_FRAMES,
+    THOUGHT_INITIAL_DELAY,
     HYDRATION_MAX,
     HYDRATION_REFILL,
     HYDRATION_DEPLETION,
@@ -49,6 +51,7 @@ from .messages import (
 )
 from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound
 from .thoughts import check_triggers, get_memory
+
 
 def init() -> tuple[Model, list[Cmd]]:
     model = Model(
@@ -168,7 +171,9 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     triggered = check_triggers(model.cycle, model.learned, new_seen)
                     if triggered is not None:
                         mem = get_memory(triggered)
-                        duration = len(mem.text) * THOUGHT_CHAR_SPEED + THOUGHT_READ_FRAMES
+                        duration = (
+                            len(mem.text) * THOUGHT_CHAR_SPEED + THOUGHT_READ_FRAMES
+                        )
                         new_thought = ThoughtBubble(
                             memory_id=mem.id,
                             text=mem.text,

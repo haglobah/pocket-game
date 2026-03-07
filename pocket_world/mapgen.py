@@ -19,8 +19,11 @@ def _hash_grid(seed: int, cols: int, rows: int) -> np.ndarray:
     ix = np.arange(cols, dtype=np.uint32)
     iy = np.arange(rows, dtype=np.uint32)
     # shape (rows, cols) via broadcasting
-    h = (np.uint32(seed) ^ (ix[None, :] * np.uint32(374761393))
-         ^ (iy[:, None] * np.uint32(668265263)))
+    h = (
+        np.uint32(seed)
+        ^ (ix[None, :] * np.uint32(374761393))
+        ^ (iy[:, None] * np.uint32(668265263))
+    )
     h = (h ^ (h >> np.uint32(13))) * np.uint32(1274126177)
     h = (h ^ (h >> np.uint32(16))) * np.uint32(2024893681)
     h = h ^ (h >> np.uint32(13))
@@ -57,8 +60,11 @@ def _scatter_grid(seed: int) -> np.ndarray:
     """Vectorized hash for per-tile scatter values in [0, 1)."""
     xs = np.arange(MAP_W, dtype=np.uint32)
     ys = np.arange(MAP_H, dtype=np.uint32)
-    h = (np.uint32(seed) ^ (xs[None, :] * np.uint32(374761393))
-         ^ (ys[:, None] * np.uint32(668265263)))
+    h = (
+        np.uint32(seed)
+        ^ (xs[None, :] * np.uint32(374761393))
+        ^ (ys[:, None] * np.uint32(668265263))
+    )
     h = (h ^ (h >> np.uint32(13))) * np.uint32(1274126177)
     h = (h ^ (h >> np.uint32(16))) * np.uint32(2024893681)
     h = h ^ (h >> np.uint32(13))
@@ -101,9 +107,11 @@ def generate_map(seed: int) -> tuple[tuple[int, ...], ...]:
     tiles = np.where(cliff_edge_mask, CLIFF_EDGE, tiles)
 
     # For non-cliff tiles, apply detail/scatter classification
-    flat = (elev <= 0.58)
+    flat = elev <= 0.58
     tiles = np.where(flat & (detail > 0.65) & (scatter > 0.92), PALM_TREE, tiles)
-    tiles = np.where(flat & (detail < 0.35) & (scatter > 0.95) & (tiles == SAND), CACTUS, tiles)
+    tiles = np.where(
+        flat & (detail < 0.35) & (scatter > 0.95) & (tiles == SAND), CACTUS, tiles
+    )
     tiles = np.where(flat & (scatter > 0.985) & (tiles == SAND), DEAD_BUSH, tiles)
     tiles = np.where(flat & (scatter > 0.975) & (tiles == SAND), ROCK, tiles)
     tiles = np.where(flat & (detail > 0.55) & (tiles == SAND), SAND_DARK, tiles)
