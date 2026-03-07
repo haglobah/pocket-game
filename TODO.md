@@ -7,13 +7,13 @@
 # Gameplay
 
 - [x] Unter Wasser sein: -> Im Wasser 'laufen' können
-- [ ] Kiemen-/Lungenmodus on some key press
-- [ ] O2 bar
-- [ ] o2 bar soll sich depleten
+- [x] Kiemen-/Lungenmodus on some key press
+- [x] O2 bar
+- [x] o2 bar soll sich depleten
 - [ ] breathe keypress when in water
 - [ ] die when no o2
 - [ ] reset on die
-- [ ] timer
+- [ ] timer, after dead, and is shown consistently only after you reached 'world death' state (then it displays the world death countdown)
 
 ## Interaktionen
 
