@@ -244,7 +244,7 @@ def init() -> tuple[Model, list[Cmd]]:
         seed_input="",
         frame=0,
         o2=O2_MAX,
-        breathing_mode=LUNGS,
+        breathing_mode=GILLS,
     )
     return model, []
 
