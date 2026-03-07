@@ -4,7 +4,7 @@
 
 All games follow the **Elm Architecture** (Model-Update-View) adapted for Python/Pyxel.
 
-The main game is `pocket_world.py`.
+The main game is in the `pocket_world/` package.
 
 ### Core Components
 
@@ -125,16 +125,25 @@ class App:
 3. **Side effects live in `interpret_cmd`** — this is the only place that calls pyxel.play, pyxel.rndi, etc.
 4. **Input collection lives in `_collect_input`** — maps pyxel button state to `Msg` objects.
 5. **`view` is read-only** — reads model, draws pixels, never modifies state.
-6. **One file per game** — keep games self-contained unless complexity demands otherwise.
+6. **One package per game** — each game is a Python package (folder with `__init__.py`).
 
 ### File Structure
 
 ```txt
 pocket/
-  CLAUDE.md              # This file
-  pyxel_examples/        # Reference examples (07_snake.py is the Elm arch reference)
-  water_game.py          # Existing game (OOP style, pre-refactor)
-  <new_game>.py          # New games go in project root
+  CLAUDE.md
+  pocket_world/          # Main game package
+    __init__.py
+    app.py               # App class, interpret_cmd, _collect_input, define_sounds
+    commands.py           # Cmd base class and command dataclasses
+    constants.py          # Dimensions, tile types, game constants, Point namedtuple
+    mapgen.py             # Procedural map generation (pure)
+    messages.py           # Msg base class and message dataclasses
+    model.py              # Model frozen dataclass
+    update.py             # init() and update() — pure game logic
+    view.py               # view() and drawing helpers
+  pocket_world.py         # Entry point (runs the app)
+  pocket_world.pyxres     # Sprite/resource file
 ```
 
 ## Pyxel Conventions
@@ -144,4 +153,4 @@ pocket/
 - Colors: Pyxel has a fixed 16-color palette (0-15).
 - Sounds: Define in a `define_sounds()` function, use `pyxel.sounds[n].set(...)`.
 - Input: `pyxel.btn()` for held keys, `pyxel.btnp()` for press events.
-- Run: `pyxel run pocket_world.py` — no build step.
+- Run: `pyxel run pocket_world.py` — entry point imports from the `pocket_world` package.
