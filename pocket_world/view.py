@@ -11,14 +11,14 @@ from .constants import (
     MAP_W,
     MAP_H,
     WATER,
-    GRASS,
-    TALL_GRASS,
-    FLOWERS,
-    DIRT,
     SAND,
-    TREE,
+    SAND_DARK,
+    CLIFF,
+    CLIFF_EDGE,
+    PALM_TREE,
+    CACTUS,
+    DEAD_BUSH,
     ROCK,
-    BUSH,
     UP,
     DOWN,
     LEFT,
@@ -82,17 +82,100 @@ def _get_thought_font():
 
 
 def draw_tile(sx: int, sy: int, tile: int, frame: int):
-    """Draw a tile at screen pixel position (sx, sy) — 32x32, using sprites."""
-    if tile == WATER:
+    """Draw a 32x32 desert tile at screen pixel position (sx, sy)."""
+    if tile == SAND:
+        # Light sand base
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Subtle dot pattern for texture
+        for i in range(3):
+            dx = ((sx + i * 13) * 7 + sy * 3) % 28 + 2
+            dy = ((sy + i * 11) * 5 + sx * 7) % 28 + 2
+            pyxel.pset(sx + dx, sy + dy, 9)
+    elif tile == SAND_DARK:
+        # Darker sand with ripple texture
+        pyxel.rect(sx, sy, 32, 32, 9)
+        for i in range(4):
+            dx = ((sx + i * 17) * 3 + sy) % 26 + 3
+            dy = ((sy + i * 7) * 11 + sx * 3) % 26 + 3
+            pyxel.pset(sx + dx, sy + dy, 10)
+    elif tile == CLIFF:
+        # Rocky cliff - dark brown with texture
+        pyxel.rect(sx, sy, 32, 32, 4)
+        # Rock texture lines
+        for i in range(5):
+            lx = ((sx * 3 + i * 19 + sy) % 24) + sx + 2
+            ly = ((sy * 7 + i * 13 + sx) % 24) + sy + 4
+            pyxel.line(lx, ly, lx + 5, ly + 1, 2)
+        # Highlight spots
+        for i in range(3):
+            dx = ((sx + i * 23) * 11 + sy * 5) % 26 + 3
+            dy = ((sy + i * 19) * 7 + sx) % 26 + 3
+            pyxel.pset(sx + dx, sy + dy, 13)
+    elif tile == CLIFF_EDGE:
+        # Transition: sand base with cliff edge marks
+        pyxel.rect(sx, sy, 32, 32, 9)
+        # Rocky top edge
+        pyxel.rect(sx, sy, 32, 8, 4)
+        pyxel.rect(sx + 4, sy + 8, 24, 4, 4)
+        for i in range(6):
+            dx = ((sx + i * 11) % 28) + 2
+            pyxel.pset(sx + dx, sy + 12, 4)
+    elif tile == PALM_TREE:
+        # Sand base
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Trunk
+        pyxel.rect(sx + 14, sy + 12, 4, 20, 4)
+        pyxel.rect(sx + 15, sy + 14, 2, 16, 2)
+        # Fronds (green leaf clusters)
+        pyxel.circ(sx + 16, sy + 10, 8, 3)
+        pyxel.circ(sx + 10, sy + 6, 5, 11)
+        pyxel.circ(sx + 22, sy + 6, 5, 11)
+        pyxel.circ(sx + 16, sy + 3, 5, 3)
+        # Coconuts
+        pyxel.circ(sx + 13, sy + 11, 2, 4)
+        pyxel.circ(sx + 19, sy + 11, 2, 9)
+    elif tile == CACTUS:
+        # Sand base
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Main cactus body
+        pyxel.rect(sx + 12, sy + 8, 8, 22, 3)
+        pyxel.rect(sx + 13, sy + 9, 6, 20, 11)
+        # Left arm
+        pyxel.rect(sx + 6, sy + 12, 6, 6, 3)
+        pyxel.rect(sx + 6, sy + 10, 4, 4, 3)
+        pyxel.rect(sx + 7, sy + 13, 4, 4, 11)
+        # Right arm
+        pyxel.rect(sx + 20, sy + 16, 6, 6, 3)
+        pyxel.rect(sx + 22, sy + 14, 4, 4, 3)
+        pyxel.rect(sx + 21, sy + 17, 4, 4, 11)
+    elif tile == DEAD_BUSH:
+        # Sand base with dried bush
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Small dried bush
+        cx, cy = sx + 16, sy + 24
+        pyxel.line(cx, cy, cx - 6, cy - 10, 4)
+        pyxel.line(cx, cy, cx + 5, cy - 8, 4)
+        pyxel.line(cx, cy, cx - 2, cy - 12, 9)
+        pyxel.line(cx - 6, cy - 10, cx - 10, cy - 14, 4)
+        pyxel.line(cx + 5, cy - 8, cx + 9, cy - 12, 9)
+        pyxel.line(cx - 2, cy - 12, cx - 4, cy - 16, 4)
+    elif tile == ROCK:
+        # Sand base with a boulder
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Rock shape
+        pyxel.circ(sx + 16, sy + 22, 8, 13)
+        pyxel.circ(sx + 14, sy + 20, 6, 7)
+        pyxel.circ(sx + 18, sy + 24, 5, 5)
+    elif tile == WATER:
+        # Water (keeping for potential oases)
         water_frame = (frame // 80) % 4
-        if water_frame == 0:
-            pyxel.blt(sx, sy, 0, 128, 0, 32, 32)
-        else:
-            pyxel.blt(sx, sy, 0, 32 * water_frame, 32, 32, 32)
-    elif tile <= 7:
-        pyxel.blt(sx, sy, 0, tile * 32, 0, 32, 32)
-    else:  # BUSH (8)
-        pyxel.blt(sx, sy, 0, 0, 32, 32, 32)
+        c1, c2 = 5, 12
+        if water_frame % 2 == 0:
+            c1, c2 = c2, c1
+        pyxel.rect(sx, sy, 32, 32, c1)
+        for i in range(3):
+            wy = sy + 6 + i * 10 + (water_frame * 3) % 8
+            pyxel.line(sx + 4, wy, sx + 28, wy, c2)
 
 
 def draw_character(sx: int, sy: int, facing, frame: int):
@@ -331,8 +414,12 @@ def view_play(model: Model):
 
     for sy in range(VIEWPORT_H):
         for sx in range(VIEWPORT_W):
-            tx = (cam_x + sx) % MAP_W
-            ty = (cam_y + sy) % MAP_H
+            tx = cam_x + sx
+            ty = cam_y + sy
+            # Don't wrap - show black beyond map edges
+            if tx < 0 or tx >= MAP_W or ty < 0 or ty >= MAP_H:
+                pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 0)
+                continue
             tile = model.tilemap[ty][tx]
             if underwater and tile != WATER:
                 pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 1)

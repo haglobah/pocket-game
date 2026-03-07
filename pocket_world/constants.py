@@ -2,8 +2,8 @@ from collections import namedtuple
 
 Point = namedtuple("Point", ["x", "y"])
 
-MAP_W = 100
-MAP_H = 100
+MAP_W = 2000
+MAP_H = 1000
 TILE_SIZE = 32
 VIEWPORT_W = 24  # tiles visible on screen
 VIEWPORT_H = 24
@@ -12,23 +12,31 @@ SCREEN_W = VIEWPORT_W * TILE_SIZE  # 512
 SCREEN_H = VIEWPORT_H * TILE_SIZE + DEBUG_HEIGHT
 
 # Tile types
-GRASS = 0
-TALL_GRASS = 1
-FLOWERS = 2
-DIRT = 3
-WATER = 4
-SAND = 5
-TREE = 6
+SAND = 0
+SAND_DARK = 1
+CLIFF = 2
+CLIFF_EDGE = 3
+PALM_TREE = 4
+CACTUS = 5
+DEAD_BUSH = 6
 ROCK = 7
-BUSH = 8
+WATER = 8
+
+# Keep old names mapped for compatibility
+GRASS = SAND
+TALL_GRASS = SAND
+FLOWERS = SAND
+DIRT = SAND_DARK
+TREE = PALM_TREE
+BUSH = DEAD_BUSH
 
 
 def is_walkable(tile: int) -> bool:
-    return tile in (GRASS, TALL_GRASS, BUSH, FLOWERS, DIRT, SAND)
+    return tile in (SAND, SAND_DARK, DEAD_BUSH)
 
 
 def is_swimmable(tile: int) -> bool:
-    return tile is WATER
+    return tile == WATER
 
 
 # Movement speed (frames between steps)

@@ -74,15 +74,31 @@ def _wrap(p: Point) -> Point:
     return Point(p.x % MAP_W, p.y % MAP_H)
 
 
+def _clamp(p: Point) -> Point:
+    """Clamp position to map bounds (no visual wrapping)."""
+    return Point(max(0, min(MAP_W - 1, p.x)), max(0, min(MAP_H - 1, p.y)))
+
+
+def _adjacent_tiles(pos: Point, tilemap: tuple[tuple[int, ...], ...]) -> list[int]:
+    """Return tile types of the 4 cardinal neighbors (clamped to map bounds)."""
+    tiles = []
+    for dx, dy in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+        nx, ny = pos.x + dx, pos.y + dy
+        if 0 <= nx < MAP_W and 0 <= ny < MAP_H:
+            tiles.append(tilemap[ny][nx])
+    return tiles
+
+
 def _find_spawn(tilemap: tuple[tuple[int, ...], ...]) -> Point:
     """Find a walkable spawn near center."""
     cx, cy = MAP_W // 2, MAP_H // 2
     for r in range(max(MAP_W, MAP_H)):
         for dx in range(-r, r + 1):
             for dy in range(-r, r + 1):
-                p = _wrap(Point(cx + dx, cy + dy))
-                if is_swimmable(tilemap[p.y][p.x]):
-                    return p
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < MAP_W and 0 <= ny < MAP_H:
+                    if is_walkable(tilemap[ny][nx]):
+                        return Point(nx, ny)
     return Point(cx, cy)
 
 
