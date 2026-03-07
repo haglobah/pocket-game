@@ -6,7 +6,7 @@
 
 # Gameplay
 
-- [ ] Unter Wasser sein: -> Im Wasser 'laufen' können
+- [x] Unter Wasser sein: -> Im Wasser 'laufen' können
 - [ ] Kiemen-/Lungenmodus on some key press
 - [ ] O2 bar
 - [ ] o2 bar soll sich depleten

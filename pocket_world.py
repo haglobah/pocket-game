@@ -368,12 +368,18 @@ def view_play(model: Model):
     cam_x = px - VIEWPORT_W // 2
     cam_y = py - VIEWPORT_H // 2
 
+    underwater = model.tilemap[py][px] == WATER
+
     for sy in range(VIEWPORT_H):
         for sx in range(VIEWPORT_W):
             tx = (cam_x + sx) % MAP_W
             ty = (cam_y + sy) % MAP_H
             tile = model.tilemap[ty][tx]
-            draw_tile(sx * TILE_SIZE, sy * TILE_SIZE, tile, model.frame)
+            if underwater and tile != WATER:
+                # Can't see above-water tiles when submerged
+                pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 1)
+            else:
+                draw_tile(sx * TILE_SIZE, sy * TILE_SIZE, tile, model.frame)
 
     # Draw player at center of screen
     pcx = (VIEWPORT_W // 2) * TILE_SIZE
