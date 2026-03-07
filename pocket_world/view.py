@@ -82,6 +82,27 @@ def _get_thought_font():
         _THOUGHT_FONT = _load_ui_font("PixelMplus12-Regular.ttf", _THOUGHT_FONT_SIZE)
     return _THOUGHT_FONT
 
+# Minimap: 1 pixel per 8 tiles → 250x125 pixels
+MINIMAP_SCALE = 8
+MINIMAP_W = MAP_W // MINIMAP_SCALE  # 250
+MINIMAP_H = MAP_H // MINIMAP_SCALE  # 125
+
+# Color mapping for minimap pixels
+_MINIMAP_COLORS = {
+    SAND: 10,
+    SAND_DARK: 9,
+    CLIFF: 4,
+    CLIFF_EDGE: 4,
+    PALM_TREE: 11,
+    CACTUS: 3,
+    DEAD_BUSH: 9,
+    ROCK: 13,
+    WATER: 5,
+}
+
+# Cache the seed for which image bank 2 has been written
+_minimap_cache_seed: int | None = None
+
 
 def draw_tile(sx: int, sy: int, tile: int, frame: int):
     """Draw a 32x32 desert tile at screen pixel position (sx, sy)."""
@@ -385,6 +406,39 @@ def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
         lx = bx + pad_x
         pyxel.text(lx, ty, line, 1, thought_font)
         ty += line_h
+def _ensure_minimap(model: Model):
+    """Write minimap to image bank 2 if not already cached for this seed."""
+    global _minimap_cache_seed
+    if _minimap_cache_seed == model.seed:
+        return
+    img = pyxel.images[2]
+    for my in range(MINIMAP_H):
+        ty = my * MINIMAP_SCALE
+        for mx in range(MINIMAP_W):
+            tx = mx * MINIMAP_SCALE
+            tile = model.tilemap[ty][tx]
+            img.pset(mx, my, _MINIMAP_COLORS.get(tile, 0))
+    _minimap_cache_seed = model.seed
+
+
+def _draw_minimap(model: Model):
+    """Draw minimap overlay centered on screen."""
+    _ensure_minimap(model)
+    # Position at lower-right of the viewport
+    mx = SCREEN_W - MINIMAP_W - 4
+    my = VIEWPORT_H * TILE_SIZE - MINIMAP_H - 4
+    # Dark background with border
+    pyxel.rect(mx - 2, my - 2, MINIMAP_W + 4, MINIMAP_H + 4, 0)
+    pyxel.rectb(mx - 2, my - 2, MINIMAP_W + 4, MINIMAP_H + 4, 7)
+    # Blit the precomputed minimap from image bank 2
+    pyxel.blt(mx, my, 2, 0, 0, MINIMAP_W, MINIMAP_H)
+    # Player dot (blinking)
+    px = model.player_pos.x // MINIMAP_SCALE
+    py = model.player_pos.y // MINIMAP_SCALE
+    dot_col = 8 if (model.frame // 15) % 2 == 0 else 7
+    pyxel.rect(mx + px - 1, my + py - 1, 3, 3, dot_col)
+    # Label
+    pyxel.text(mx + MINIMAP_W - len("[M] Map") * pyxel.FONT_WIDTH, my - 10, "[M] Map", 7)
 
 
 def view_play(model: Model):
@@ -461,6 +515,10 @@ def view_play(model: Model):
 
     # Hunger bar
     _draw_bar(bar_y, model.hunger / HUNGER_MAX, "Food [E]", 11, 9, 8)
+
+    # Minimap overlay
+    if model.show_minimap:
+        _draw_minimap(model)
 
     # Debug panel below map
     tile_names = {

@@ -70,5 +70,10 @@ class DismissDeathScreen(Msg):
 
 
 @dataclass(frozen=True)
+class ToggleMinimap(Msg):
+    pass
+
+
+@dataclass(frozen=True)
 class RewindTick(Msg):
     pass

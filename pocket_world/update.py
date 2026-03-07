@@ -42,6 +42,7 @@ from .messages import (
     ToggleBreathingMode,
     Drink,
     Eat,
+    ToggleMinimap,
     Die,
     DismissDeathScreen,
     RewindTick,
@@ -320,6 +321,11 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     hunger=new_hunger,
                     learned=_add_learned(model, "eating plants"),
                 ), []
+            return model, []
+
+        case ToggleMinimap():
+            if model.state == "play":
+                return replace(model, show_minimap=not model.show_minimap), []
             return model, []
 
         case Die(reason=r):

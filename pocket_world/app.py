@@ -16,6 +16,7 @@ from .messages import (
     ToggleBreathingMode,
     Drink,
     Eat,
+    ToggleMinimap,
     DismissDeathScreen,
     RewindTick,
 )
@@ -126,6 +127,8 @@ class App:
                 msgs.append(Drink())
             if pyxel.btnp(pyxel.KEY_E):
                 msgs.append(Eat())
+            if pyxel.btnp(pyxel.KEY_M):
+                msgs.append(ToggleMinimap())
 
         elif self.model.state == "dead":
             if pyxel.btnp(pyxel.KEY_RETURN):

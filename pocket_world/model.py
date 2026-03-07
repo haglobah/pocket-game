@@ -43,6 +43,7 @@ class Model:
     thought: ThoughtBubble | None
     seen_memories: tuple[str, ...]
     thought_cooldown: int
+    show_minimap: bool  # whether minimap overlay is visible
 
 
 def init() -> tuple[Model, list[Cmd]]:
@@ -64,5 +65,6 @@ def init() -> tuple[Model, list[Cmd]]:
         learned=(),
         death_timer=0,
         rewind_timer=0,
+        show_minimap=False,
     )
     return model, []
