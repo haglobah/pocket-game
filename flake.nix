@@ -45,6 +45,7 @@
               nixfmt
               just
               pyxel
+              ruff
               # (python3.withPackages (pp: [
               #   pp.pyxel # for example
               # ]))
