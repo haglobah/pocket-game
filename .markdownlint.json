@@ -1,0 +1,7 @@
+{
+    "blanks-around-lists" : false,
+    "blanks-around-headings" : false,
+    "first-line-heading" : false,
+    "single-h1" : false,
+    "line-length": false
+}

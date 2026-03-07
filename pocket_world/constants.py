@@ -2,8 +2,8 @@ from collections import namedtuple
 
 Point = namedtuple("Point", ["x", "y"])
 
-MAP_W = 100
-MAP_H = 100
+MAP_W = 2000
+MAP_H = 1000
 TILE_SIZE = 32
 VIEWPORT_W = 24  # tiles visible on screen
 VIEWPORT_H = 24
@@ -12,21 +12,32 @@ SCREEN_W = VIEWPORT_W * TILE_SIZE  # 512
 SCREEN_H = VIEWPORT_H * TILE_SIZE + DEBUG_HEIGHT
 
 # Tile types
-GRASS = 0
-TALL_GRASS = 1
-FLOWERS = 2
-DIRT = 3
-WATER = 4
-SAND = 5
-TREE = 6
+SAND = 0
+SAND_DARK = 1
+CLIFF = 2
+CLIFF_EDGE = 3
+PALM_TREE = 4
+CACTUS = 5
+DEAD_BUSH = 6
 ROCK = 7
-BUSH = 8
+WATER = 8
+
+# Keep old names mapped for compatibility
+GRASS = SAND
+TALL_GRASS = SAND
+FLOWERS = SAND
+DIRT = SAND_DARK
+TREE = PALM_TREE
+BUSH = DEAD_BUSH
+
 
 def is_walkable(tile: int) -> bool:
-    return tile in (GRASS, TALL_GRASS, BUSH, FLOWERS, DIRT, SAND)
+    return tile in (SAND, SAND_DARK, DEAD_BUSH)
+
 
 def is_swimmable(tile: int) -> bool:
-    return tile is WATER
+    return tile == WATER
+
 
 # Movement speed (frames between steps)
 MOVE_DELAY_WATER = 12
@@ -38,6 +49,20 @@ O2_MAX = 20 * 60  # 40 seconds at 60fps
 O2_BREATHE_REFILL = 10 * 60  # 20 seconds refill per key press
 O2_AUTO_REFILL_RATE = 4  # frames of O2 restored per frame when auto-breathing
 O2_LUNGS_UNDERWATER_CHUNK = 3 * 60  # 3 seconds of O2 lost per gulp (every second)
+
+# Hydration system
+HYDRATION_MAX = 45 * 60  # 45 seconds at 60fps
+HYDRATION_REFILL = 20 * 60  # 20 seconds per drink
+HYDRATION_DEPLETION = 1  # frames lost per frame
+
+# Hunger system
+HUNGER_MAX = 60 * 60  # 60 seconds at 60fps
+HUNGER_REFILL = 25 * 60  # 25 seconds per eat
+HUNGER_DEPLETION = 1  # frames lost per frame
+
+# Edible / drinkable tiles
+FOOD_TILES = (4, 5)  # PALM_TREE, CACTUS
+DRINK_TILES = (8,)  # WATER
 
 # Death screen / rewind
 DEATH_SCREEN_MIN_FRAMES = 60  # minimum frames before ENTER accepted

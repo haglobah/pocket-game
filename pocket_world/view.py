@@ -2,12 +2,34 @@ import pyxel
 from pathlib import Path
 
 from .constants import (
-    SCREEN_W, SCREEN_H, TILE_SIZE, VIEWPORT_W, VIEWPORT_H, DEBUG_HEIGHT,
-    MAP_W, MAP_H,
-    WATER, GRASS, TALL_GRASS, FLOWERS, DIRT, SAND, TREE, ROCK, BUSH,
-    UP, DOWN, LEFT, RIGHT,
+    SCREEN_W,
+    SCREEN_H,
+    TILE_SIZE,
+    VIEWPORT_W,
+    VIEWPORT_H,
+    DEBUG_HEIGHT,
+    MAP_W,
+    MAP_H,
+    WATER,
+    SAND,
+    SAND_DARK,
+    CLIFF,
+    CLIFF_EDGE,
+    PALM_TREE,
+    CACTUS,
+    DEAD_BUSH,
+    ROCK,
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT,
     UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT, DIR_NAME,
-    LUNGS, O2_MAX, DEATH_SCREEN_MIN_FRAMES, REWIND_DURATION,
+    LUNGS,
+    O2_MAX,
+    HYDRATION_MAX,
+    HUNGER_MAX,
+    DEATH_SCREEN_MIN_FRAMES,
+    REWIND_DURATION,
     THOUGHT_CHAR_SPEED,
 )
 from .model import Model, ThoughtBubble
@@ -60,19 +82,123 @@ def _get_thought_font():
         _THOUGHT_FONT = _load_ui_font("PixelMplus12-Regular.ttf", _THOUGHT_FONT_SIZE)
     return _THOUGHT_FONT
 
+# Minimap: 1 pixel per 8 tiles → 250x125 pixels
+MINIMAP_SCALE = 8
+MINIMAP_W = MAP_W // MINIMAP_SCALE  # 250
+MINIMAP_H = MAP_H // MINIMAP_SCALE  # 125
+
+# Color mapping for minimap pixels
+_MINIMAP_COLORS = {
+    SAND: 10,
+    SAND_DARK: 9,
+    CLIFF: 4,
+    CLIFF_EDGE: 4,
+    PALM_TREE: 11,
+    CACTUS: 3,
+    DEAD_BUSH: 9,
+    ROCK: 13,
+    WATER: 5,
+}
+
+# Cache the seed for which image bank 2 has been written
+_minimap_cache_seed: int | None = None
+
 
 def draw_tile(sx: int, sy: int, tile: int, frame: int):
-    """Draw a tile at screen pixel position (sx, sy) — 32x32, using sprites."""
-    if tile == WATER:
+    """Draw a 32x32 desert tile at screen pixel position (sx, sy)."""
+    if tile == SAND:
+        # Light sand base
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Subtle dot pattern for texture
+        for i in range(3):
+            dx = ((sx + i * 13) * 7 + sy * 3) % 28 + 2
+            dy = ((sy + i * 11) * 5 + sx * 7) % 28 + 2
+            pyxel.pset(sx + dx, sy + dy, 9)
+    elif tile == SAND_DARK:
+        # Darker sand with ripple texture
+        pyxel.rect(sx, sy, 32, 32, 9)
+        for i in range(4):
+            dx = ((sx + i * 17) * 3 + sy) % 26 + 3
+            dy = ((sy + i * 7) * 11 + sx * 3) % 26 + 3
+            pyxel.pset(sx + dx, sy + dy, 10)
+    elif tile == CLIFF:
+        # Rocky cliff - dark brown with texture
+        pyxel.rect(sx, sy, 32, 32, 4)
+        # Rock texture lines
+        for i in range(5):
+            lx = ((sx * 3 + i * 19 + sy) % 24) + sx + 2
+            ly = ((sy * 7 + i * 13 + sx) % 24) + sy + 4
+            pyxel.line(lx, ly, lx + 5, ly + 1, 2)
+        # Highlight spots
+        for i in range(3):
+            dx = ((sx + i * 23) * 11 + sy * 5) % 26 + 3
+            dy = ((sy + i * 19) * 7 + sx) % 26 + 3
+            pyxel.pset(sx + dx, sy + dy, 13)
+    elif tile == CLIFF_EDGE:
+        # Transition: sand base with cliff edge marks
+        pyxel.rect(sx, sy, 32, 32, 9)
+        # Rocky top edge
+        pyxel.rect(sx, sy, 32, 8, 4)
+        pyxel.rect(sx + 4, sy + 8, 24, 4, 4)
+        for i in range(6):
+            dx = ((sx + i * 11) % 28) + 2
+            pyxel.pset(sx + dx, sy + 12, 4)
+    elif tile == PALM_TREE:
+        # Sand base
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Trunk
+        pyxel.rect(sx + 14, sy + 12, 4, 20, 4)
+        pyxel.rect(sx + 15, sy + 14, 2, 16, 2)
+        # Fronds (green leaf clusters)
+        pyxel.circ(sx + 16, sy + 10, 8, 3)
+        pyxel.circ(sx + 10, sy + 6, 5, 11)
+        pyxel.circ(sx + 22, sy + 6, 5, 11)
+        pyxel.circ(sx + 16, sy + 3, 5, 3)
+        # Coconuts
+        pyxel.circ(sx + 13, sy + 11, 2, 4)
+        pyxel.circ(sx + 19, sy + 11, 2, 9)
+    elif tile == CACTUS:
+        # Sand base
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Main cactus body
+        pyxel.rect(sx + 12, sy + 8, 8, 22, 3)
+        pyxel.rect(sx + 13, sy + 9, 6, 20, 11)
+        # Left arm
+        pyxel.rect(sx + 6, sy + 12, 6, 6, 3)
+        pyxel.rect(sx + 6, sy + 10, 4, 4, 3)
+        pyxel.rect(sx + 7, sy + 13, 4, 4, 11)
+        # Right arm
+        pyxel.rect(sx + 20, sy + 16, 6, 6, 3)
+        pyxel.rect(sx + 22, sy + 14, 4, 4, 3)
+        pyxel.rect(sx + 21, sy + 17, 4, 4, 11)
+    elif tile == DEAD_BUSH:
+        # Sand base with dried bush
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Small dried bush
+        cx, cy = sx + 16, sy + 24
+        pyxel.line(cx, cy, cx - 6, cy - 10, 4)
+        pyxel.line(cx, cy, cx + 5, cy - 8, 4)
+        pyxel.line(cx, cy, cx - 2, cy - 12, 9)
+        pyxel.line(cx - 6, cy - 10, cx - 10, cy - 14, 4)
+        pyxel.line(cx + 5, cy - 8, cx + 9, cy - 12, 9)
+        pyxel.line(cx - 2, cy - 12, cx - 4, cy - 16, 4)
+    elif tile == ROCK:
+        # Sand base with a boulder
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Rock shape
+        pyxel.circ(sx + 16, sy + 22, 8, 13)
+        pyxel.circ(sx + 14, sy + 20, 6, 7)
+        pyxel.circ(sx + 18, sy + 24, 5, 5)
+    elif tile == WATER:
+        # Water (keeping for potential oases)
         water_frame = (frame // 80) % 4
-        if water_frame == 0:
-            pyxel.blt(sx, sy, 0, 128, 0, 32, 32)
-        else:
-            pyxel.blt(sx, sy, 0, 32 * water_frame, 32, 32, 32)
-    elif tile <= 7:
-        pyxel.blt(sx, sy, 0, tile * 32, 0, 32, 32)
-    else:  # BUSH (8)
-        pyxel.blt(sx, sy, 0, 0, 32, 32, 32)
+        c1, c2 = 5, 12
+        if water_frame % 2 == 0:
+            c1, c2 = c2, c1
+        pyxel.rect(sx, sy, 32, 32, c1)
+        for i in range(3):
+            wy = sy + 6 + i * 10 + (water_frame * 3) % 8
+            pyxel.line(sx + 4, wy, sx + 28, wy, c2)
 
 
 def draw_character(sx: int, sy: int, facing, frame: int):
@@ -112,7 +238,6 @@ def view_title(model: Model):
     title = "POCKET WORLD"
     _center_text(260, title, 7, title_font)
 
-    # Seed input
     prompt = "Enter seed (or press ENTER for random):"
     _center_text(320, prompt, 13, ui_font)
 
@@ -122,15 +247,13 @@ def view_title(model: Model):
     hint = "[ENTER] Start"
     _center_text(390, hint, 6, ui_font)
 
-    # Draw the character as preview
     draw_character(SCREEN_W // 2 - 16, 210, DOWN, model.frame)
 
 
-def _center_text(y: int, text: str, col: int, font=None):
-    """Draw text centered horizontally."""
+def _center_text(y: int, text: str, col: int):
     width = font.text_width(text) if font else len(text) * pyxel.FONT_WIDTH
     x = (SCREEN_W - width) // 2
-    pyxel.text(x, y, text, col, font)
+    pyxel.text(x, y, text, col)
 
 
 def view_death(model: Model):
@@ -164,47 +287,33 @@ def view_death(model: Model):
 
 
 def _draw_hourglass(cx: int, cy: int, fill_frac: float):
-    """Draw a simple hourglass at center (cx, cy). fill_frac 0..1 = how full bottom is."""
-    # Outer frame
     hw, hh = 20, 40
-    # Top triangle (emptying)
-    top_fill = 1.0 - fill_frac
-    # Bottom triangle (filling)
     for i in range(hh):
-        # Width narrows toward middle
         if i < hh // 2:
             w = int(hw * (1 - i / (hh // 2)))
-            # Top half: sand only in upper portion
-            sand_h = int((hh // 2) * top_fill)
+            sand_h = int((hh // 2) * (1.0 - fill_frac))
             col = 9 if i < sand_h else 0
         else:
             j = i - hh // 2
             w = int(hw * (j / (hh // 2)))
-            # Bottom half: sand fills from bottom
             sand_h = int((hh // 2) * fill_frac)
             rows_from_bottom = hh - 1 - i
             col = 9 if rows_from_bottom < sand_h else 0
         if w > 0:
             pyxel.rect(cx - w, cy - hh // 2 + i, w * 2, 1, col)
-    # Frame lines
-    pyxel.line(cx - hw, cy - hh // 2, cx + hw, cy - hh // 2, 7)  # top
-    pyxel.line(cx - hw, cy + hh // 2, cx + hw, cy + hh // 2, 7)  # bottom
-    pyxel.line(cx - hw, cy - hh // 2, cx, cy, 7)  # top-left diagonal
-    pyxel.line(cx + hw, cy - hh // 2, cx, cy, 7)  # top-right diagonal
-    pyxel.line(cx - hw, cy + hh // 2, cx, cy, 7)  # bottom-left diagonal
-    pyxel.line(cx + hw, cy + hh // 2, cx, cy, 7)  # bottom-right diagonal
+    pyxel.line(cx - hw, cy - hh // 2, cx + hw, cy - hh // 2, 7)
+    pyxel.line(cx - hw, cy + hh // 2, cx + hw, cy + hh // 2, 7)
+    pyxel.line(cx - hw, cy - hh // 2, cx, cy, 7)
+    pyxel.line(cx + hw, cy - hh // 2, cx, cy, 7)
+    pyxel.line(cx - hw, cy + hh // 2, cx, cy, 7)
+    pyxel.line(cx + hw, cy + hh // 2, cx, cy, 7)
 
 
 def view_rewind(model: Model):
     pyxel.cls(0)
-    # fill_frac goes from 0 to 1 as rewind_timer counts down
     fill_frac = 1.0 - (model.rewind_timer / REWIND_DURATION)
-
     _draw_hourglass(SCREEN_W // 2, SCREEN_H // 2 - 20, fill_frac)
-
     _center_text(SCREEN_H // 2 + 50, "Rewinding...", 7)
-
-    # Cycle number
     _center_text(SCREEN_H // 2 + 70, f"Cycle {model.cycle + 1}", 13)
 
 
@@ -297,13 +406,45 @@ def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
         lx = bx + pad_x
         pyxel.text(lx, ty, line, 1, thought_font)
         ty += line_h
+def _ensure_minimap(model: Model):
+    """Write minimap to image bank 2 if not already cached for this seed."""
+    global _minimap_cache_seed
+    if _minimap_cache_seed == model.seed:
+        return
+    img = pyxel.images[2]
+    for my in range(MINIMAP_H):
+        ty = my * MINIMAP_SCALE
+        for mx in range(MINIMAP_W):
+            tx = mx * MINIMAP_SCALE
+            tile = model.tilemap[ty][tx]
+            img.pset(mx, my, _MINIMAP_COLORS.get(tile, 0))
+    _minimap_cache_seed = model.seed
+
+
+def _draw_minimap(model: Model):
+    """Draw minimap overlay centered on screen."""
+    _ensure_minimap(model)
+    # Position at lower-right of the viewport
+    mx = SCREEN_W - MINIMAP_W - 4
+    my = VIEWPORT_H * TILE_SIZE - MINIMAP_H - 4
+    # Dark background with border
+    pyxel.rect(mx - 2, my - 2, MINIMAP_W + 4, MINIMAP_H + 4, 0)
+    pyxel.rectb(mx - 2, my - 2, MINIMAP_W + 4, MINIMAP_H + 4, 7)
+    # Blit the precomputed minimap from image bank 2
+    pyxel.blt(mx, my, 2, 0, 0, MINIMAP_W, MINIMAP_H)
+    # Player dot (blinking)
+    px = model.player_pos.x // MINIMAP_SCALE
+    py = model.player_pos.y // MINIMAP_SCALE
+    dot_col = 8 if (model.frame // 15) % 2 == 0 else 7
+    pyxel.rect(mx + px - 1, my + py - 1, 3, 3, dot_col)
+    # Label
+    pyxel.text(mx + MINIMAP_W - len("[M] Map") * pyxel.FONT_WIDTH, my - 10, "[M] Map", 7)
 
 
 def view_play(model: Model):
     pyxel.cls(0)
     px, py = model.player_pos
 
-    # Camera centered on player
     cam_x = px - VIEWPORT_W // 2
     cam_y = py - VIEWPORT_H // 2
 
@@ -311,8 +452,12 @@ def view_play(model: Model):
 
     for sy in range(VIEWPORT_H):
         for sx in range(VIEWPORT_W):
-            tx = (cam_x + sx) % MAP_W
-            ty = (cam_y + sy) % MAP_H
+            tx = cam_x + sx
+            ty = cam_y + sy
+            # Don't wrap - show black beyond map edges
+            if tx < 0 or tx >= MAP_W or ty < 0 or ty >= MAP_H:
+                pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 0)
+                continue
             tile = model.tilemap[ty][tx]
             if underwater and tile != WATER:
                 pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 1)
@@ -330,10 +475,21 @@ def view_play(model: Model):
         player_top = pcy
         _draw_thought_bubble(player_cx, player_top - 6, model.thought)
 
-    # O2 bar
+    # Status bars
+    bar_w = 100
+    bar_h = 6
+    bar_x = 10
+    bar_y = 10
+
+    def _draw_bar(y: int, frac: float, label: str, full_col: int, mid_col: int, low_col: int):
+        col = full_col if frac > 0.5 else (mid_col if frac > 0.25 else low_col)
+        pyxel.rect(bar_x - 1, y - 1, bar_w + 2, bar_h + 2, 0)
+        pyxel.rect(bar_x, y, int(bar_w * frac), bar_h, col)
+        pyxel.text(bar_x + bar_w + 4, y, label, 7)
+
+    # O2 bar (hidden when lungs on land and full)
     underwater = model.tilemap[py][px] == WATER
-    can_auto_breathe = (model.breathing_mode == LUNGS and not underwater)
-    # Show bar unless lungs mode on land with full O2
+    can_auto_breathe = model.breathing_mode == LUNGS and not underwater
     show_o2 = not (can_auto_breathe and model.o2 >= O2_MAX)
     if show_o2:
         hud_font = _get_hud_font()
@@ -350,14 +506,45 @@ def view_play(model: Model):
         # Label
         mode_label = "LUNGS" if model.breathing_mode == LUNGS else "GILLS"
         pyxel.text(bar_x + bar_w + 8, bar_y - 1, f"O2 [{mode_label}]", 7, hud_font)
+        _draw_bar(bar_y, model.o2 / O2_MAX, f"O2 [{mode_label}]", 11, 9, 8)
+        bar_y += bar_h + 4
+
+    # Hydration bar
+    _draw_bar(bar_y, model.hydration / HYDRATION_MAX, "Water [Q]", 12, 6, 8)
+    bar_y += bar_h + 4
+
+    # Hunger bar
+    _draw_bar(bar_y, model.hunger / HUNGER_MAX, "Food [E]", 11, 9, 8)
+
+    # Minimap overlay
+    if model.show_minimap:
+        _draw_minimap(model)
 
     # Debug panel below map
+    tile_names = {
+        SAND: "sand",
+        SAND_DARK: "dark_sand",
+        CLIFF: "cliff",
+        CLIFF_EDGE: "cliff_edge",
+        PALM_TREE: "palm",
+        CACTUS: "cactus",
+        DEAD_BUSH: "dead_bush",
+        ROCK: "rock",
+        WATER: "water",
+    }
     map_bottom = VIEWPORT_H * TILE_SIZE
     pyxel.rect(0, map_bottom, SCREEN_W, DEBUG_HEIGHT, 0)
+    dir_name = {UP: "UP", DOWN: "DOWN", LEFT: "LEFT", RIGHT: "RIGHT"}
     tile_name = {
-        GRASS: "grass", TALL_GRASS: "tall_grass", FLOWERS: "flowers",
-        DIRT: "dirt", WATER: "water", SAND: "sand",
-        TREE: "tree", ROCK: "rock", BUSH: "bush",
+        GRASS: "grass",
+        TALL_GRASS: "tall_grass",
+        FLOWERS: "flowers",
+        DIRT: "dirt",
+        WATER: "water",
+        SAND: "sand",
+        TREE: "tree",
+        ROCK: "rock",
+        BUSH: "bush",
     }
     standing_on = tile_name.get(model.tilemap[py][px], "?")
     y = map_bottom + 2
@@ -365,7 +552,7 @@ def view_play(model: Model):
         f"seed:{model.seed}  state:{model.state}",
         f"pos:({px},{py})  facing:{DIR_NAME.get(model.facing, '?')}  tile:{standing_on}",
         f"move_timer:{model.move_timer}  frame:{model.frame}",
-        f"map:{MAP_W}x{MAP_H}  o2:{model.o2 // 60}s  mode:{model.breathing_mode}",
+        f"o2:{model.o2 // 60}s  water:{model.hydration // 60}s  food:{model.hunger // 60}s  mode:{model.breathing_mode}",
     ]
     for line in lines:
         pyxel.text(2, y, line, 7)

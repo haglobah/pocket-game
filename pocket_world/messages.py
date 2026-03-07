@@ -50,12 +50,27 @@ class ToggleBreathingMode(Msg):
 
 
 @dataclass(frozen=True)
+class Drink(Msg):
+    pass
+
+
+@dataclass(frozen=True)
+class Eat(Msg):
+    pass
+
+
+@dataclass(frozen=True)
 class Die(Msg):
     reason: str
 
 
 @dataclass(frozen=True)
 class DismissDeathScreen(Msg):
+    pass
+
+
+@dataclass(frozen=True)
+class ToggleMinimap(Msg):
     pass
 
 
