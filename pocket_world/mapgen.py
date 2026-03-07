@@ -1,3 +1,5 @@
+import numpy as np
+
 from .constants import (
     MAP_W,
     MAP_H,
@@ -12,129 +14,99 @@ from .constants import (
 )
 
 
-def _hash_pos(seed: int, x: int, y: int) -> int:
-    """Fast deterministic hash for a tile position."""
-    h = (seed ^ (x * 374761393) ^ (y * 668265263)) & 0xFFFFFFFF
-    h = ((h ^ (h >> 13)) * 1274126177) & 0xFFFFFFFF
-    h = ((h ^ (h >> 16)) * 2024893681) & 0xFFFFFFFF
-    return (h ^ (h >> 13)) & 0xFFFFFFFF
+def _hash_grid(seed: int, cols: int, rows: int) -> np.ndarray:
+    """Vectorized deterministic hash for a grid of positions -> [0,1) floats."""
+    ix = np.arange(cols, dtype=np.uint32)
+    iy = np.arange(rows, dtype=np.uint32)
+    # shape (rows, cols) via broadcasting
+    h = (np.uint32(seed) ^ (ix[None, :] * np.uint32(374761393))
+         ^ (iy[:, None] * np.uint32(668265263)))
+    h = (h ^ (h >> np.uint32(13))) * np.uint32(1274126177)
+    h = (h ^ (h >> np.uint32(16))) * np.uint32(2024893681)
+    h = h ^ (h >> np.uint32(13))
+    return (h % np.uint32(10000)).astype(np.float32) * np.float32(0.0001)
 
 
-def _make_grid(seed: int, scale: float) -> list:
-    """Precompute noise grid as flat list for fast lookup."""
-    cols = int(MAP_W / scale) + 3
-    rows_n = int(MAP_H / scale) + 3
-    hp = _hash_pos
-    grid = [0.0] * (cols * rows_n)
-    for iy in range(rows_n):
-        off = iy * cols
-        for ix in range(cols):
-            grid[off + ix] = (hp(seed, ix, iy) % 10000) * 0.0001
-    return grid, cols, scale
+def _sample_noise(grid: np.ndarray, scale: float) -> np.ndarray:
+    """Bilinear interpolation of noise grid at every (x, y) in the map."""
+    xs = np.arange(MAP_W, dtype=np.float32) / np.float32(scale)
+    ys = np.arange(MAP_H, dtype=np.float32) / np.float32(scale)
+
+    ix = xs.astype(np.int32)
+    iy = ys.astype(np.int32)
+
+    fx = xs - ix.astype(np.float32)
+    fy = ys - iy.astype(np.float32)
+
+    # Smoothstep
+    fx = fx * fx * (np.float32(3.0) - np.float32(2.0) * fx)
+    fy = fy * fy * (np.float32(3.0) - np.float32(2.0) * fy)
+
+    # 2D bilinear: grid[iy, ix] etc.  Shape: (MAP_H, MAP_W)
+    tl = grid[iy[:, None], ix[None, :]]
+    tr = grid[iy[:, None], ix[None, :] + 1]
+    bl = grid[iy[:, None] + 1, ix[None, :]]
+    br = grid[iy[:, None] + 1, ix[None, :] + 1]
+
+    top = tl + (tr - tl) * fx[None, :]
+    bot = bl + (br - bl) * fx[None, :]
+    return top + (bot - top) * fy[:, None]
+
+
+def _scatter_grid(seed: int) -> np.ndarray:
+    """Vectorized hash for per-tile scatter values in [0, 1)."""
+    xs = np.arange(MAP_W, dtype=np.uint32)
+    ys = np.arange(MAP_H, dtype=np.uint32)
+    h = (np.uint32(seed) ^ (xs[None, :] * np.uint32(374761393))
+         ^ (ys[:, None] * np.uint32(668265263)))
+    h = (h ^ (h >> np.uint32(13))) * np.uint32(1274126177)
+    h = (h ^ (h >> np.uint32(16))) * np.uint32(2024893681)
+    h = h ^ (h >> np.uint32(13))
+    return (h % np.uint32(1000)).astype(np.float32) * np.float32(0.001)
 
 
 def generate_map(seed: int) -> tuple[tuple[int, ...], ...]:
     """Generate the 2000x1000 desert tile map from a seed."""
-    # Precompute noise grids
-    eg = []  # elevation grids (4 octaves)
-    s = 80.0
+    # Build noise grids and sample all 4 elevation octaves
+    weights = np.array([1.0, 0.5, 0.25, 0.125], dtype=np.float32)
+    total_weight = weights.sum()
+
+    scale = 80.0
+    elev = np.zeros((MAP_H, MAP_W), dtype=np.float32)
     for i in range(4):
-        eg.append(_make_grid(seed + i * 7777, s))
-        s *= 0.5
-    dg, dc, ds = _make_grid(seed + 5555, 20.0)  # detail grid
+        cols = int(MAP_W / scale) + 3
+        rows = int(MAP_H / scale) + 3
+        grid = _hash_grid(seed + i * 7777, cols, rows)
+        elev += _sample_noise(grid, scale) * weights[i]
+        scale *= 0.5
 
-    w0, w1, w2, w3 = 1.0, 0.5, 0.25, 0.125
-    tw = 1.0 / (w0 + w1 + w2 + w3)
+    elev /= total_weight
 
-    hp = _hash_pos
-    s3 = seed + 3333
-    _int = int
+    # Detail noise
+    detail_scale = 20.0
+    dcols = int(MAP_W / detail_scale) + 3
+    drows = int(MAP_H / detail_scale) + 3
+    detail_grid = _hash_grid(seed + 5555, dcols, drows)
+    detail = _sample_noise(detail_grid, detail_scale)
 
-    eg0, ec0, es0 = eg[0]
-    eg1, ec1, es1 = eg[1]
-    eg2, ec2, es2 = eg[2]
-    eg3, ec3, es3 = eg[3]
+    # Scatter
+    scatter = _scatter_grid(seed + 3333)
 
-    rows = []
-    for y in range(MAP_H):
-        row = [0] * MAP_W
-        for x in range(MAP_W):
-            # Inline FBM: 4 octaves of noise sampling
-            # Octave 0
-            sx0 = x / es0; sy0 = y / es0
-            ix0 = _int(sx0); iy0 = _int(sy0)
-            fx0 = sx0 - ix0; fy0 = sy0 - iy0
-            fx0 = fx0 * fx0 * (3.0 - 2.0 * fx0)
-            fy0 = fy0 * fy0 * (3.0 - 2.0 * fy0)
-            o0 = iy0 * ec0 + ix0
-            t0 = eg0[o0] + (eg0[o0+1] - eg0[o0]) * fx0
-            b0 = eg0[o0+ec0] + (eg0[o0+ec0+1] - eg0[o0+ec0]) * fx0
-            n0 = t0 + (b0 - t0) * fy0
+    # Classify tiles (start with SAND=0)
+    tiles = np.zeros((MAP_H, MAP_W), dtype=np.int32)
 
-            # Octave 1
-            sx1 = x / es1; sy1 = y / es1
-            ix1 = _int(sx1); iy1 = _int(sy1)
-            fx1 = sx1 - ix1; fy1 = sy1 - iy1
-            fx1 = fx1 * fx1 * (3.0 - 2.0 * fx1)
-            fy1 = fy1 * fy1 * (3.0 - 2.0 * fy1)
-            o1 = iy1 * ec1 + ix1
-            t1 = eg1[o1] + (eg1[o1+1] - eg1[o1]) * fx1
-            b1 = eg1[o1+ec1] + (eg1[o1+ec1+1] - eg1[o1+ec1]) * fx1
-            n1 = t1 + (b1 - t1) * fy1
+    # Elevation-based: cliff and cliff edge
+    tiles = np.where(elev > 0.62, CLIFF, tiles)
+    cliff_edge_mask = (elev > 0.58) & (elev <= 0.62)
+    tiles = np.where(cliff_edge_mask, CLIFF_EDGE, tiles)
 
-            # Octave 2
-            sx2 = x / es2; sy2 = y / es2
-            ix2 = _int(sx2); iy2 = _int(sy2)
-            fx2 = sx2 - ix2; fy2 = sy2 - iy2
-            fx2 = fx2 * fx2 * (3.0 - 2.0 * fx2)
-            fy2 = fy2 * fy2 * (3.0 - 2.0 * fy2)
-            o2 = iy2 * ec2 + ix2
-            t2 = eg2[o2] + (eg2[o2+1] - eg2[o2]) * fx2
-            b2 = eg2[o2+ec2] + (eg2[o2+ec2+1] - eg2[o2+ec2]) * fx2
-            n2 = t2 + (b2 - t2) * fy2
+    # For non-cliff tiles, apply detail/scatter classification
+    flat = (elev <= 0.58)
+    tiles = np.where(flat & (detail > 0.65) & (scatter > 0.92), PALM_TREE, tiles)
+    tiles = np.where(flat & (detail < 0.35) & (scatter > 0.95) & (tiles == SAND), CACTUS, tiles)
+    tiles = np.where(flat & (scatter > 0.985) & (tiles == SAND), DEAD_BUSH, tiles)
+    tiles = np.where(flat & (scatter > 0.975) & (tiles == SAND), ROCK, tiles)
+    tiles = np.where(flat & (detail > 0.55) & (tiles == SAND), SAND_DARK, tiles)
 
-            # Octave 3
-            sx3 = x / es3; sy3 = y / es3
-            ix3 = _int(sx3); iy3 = _int(sy3)
-            fx3 = sx3 - ix3; fy3 = sy3 - iy3
-            fx3 = fx3 * fx3 * (3.0 - 2.0 * fx3)
-            fy3 = fy3 * fy3 * (3.0 - 2.0 * fy3)
-            o3 = iy3 * ec3 + ix3
-            t3 = eg3[o3] + (eg3[o3+1] - eg3[o3]) * fx3
-            b3 = eg3[o3+ec3] + (eg3[o3+ec3+1] - eg3[o3+ec3]) * fx3
-            n3 = t3 + (b3 - t3) * fy3
-
-            elev = (n0 * w0 + n1 * w1 + n2 * w2 + n3 * w3) * tw
-
-            if elev > 0.62:
-                row[x] = CLIFF
-            elif elev > 0.58:
-                row[x] = CLIFF_EDGE
-            else:
-                # Detail noise
-                sxd = x / ds; syd = y / ds
-                ixd = _int(sxd); iyd = _int(syd)
-                fxd = sxd - ixd; fyd = syd - iyd
-                fxd = fxd * fxd * (3.0 - 2.0 * fxd)
-                fyd = fyd * fyd * (3.0 - 2.0 * fyd)
-                od = iyd * dc + ixd
-                td = dg[od] + (dg[od+1] - dg[od]) * fxd
-                bd = dg[od+dc] + (dg[od+dc+1] - dg[od+dc]) * fxd
-                detail = td + (bd - td) * fyd
-
-                scatter = hp(s3, x, y) % 1000 * 0.001
-
-                if detail > 0.65 and scatter > 0.92:
-                    row[x] = PALM_TREE
-                elif detail < 0.35 and scatter > 0.95:
-                    row[x] = CACTUS
-                elif scatter > 0.985:
-                    row[x] = DEAD_BUSH
-                elif scatter > 0.975:
-                    row[x] = ROCK
-                elif detail > 0.55:
-                    row[x] = SAND_DARK
-                # else: stays SAND (0)
-
-        rows.append(tuple(row))
-    return tuple(rows)
+    # Convert to tuple[tuple[int, ...], ...]
+    return tuple(tuple(int(v) for v in row) for row in tiles)
