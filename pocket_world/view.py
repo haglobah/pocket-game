@@ -19,6 +19,12 @@ from .constants import (
     CACTUS,
     DEAD_BUSH,
     ROCK,
+    GRASS,
+    TALL_GRASS,
+    FLOWERS,
+    DIRT,
+    TREE,
+    BUSH,
     UP,
     DOWN,
     LEFT,
@@ -250,10 +256,13 @@ def view_title(model: Model):
     draw_character(SCREEN_W // 2 - 16, 210, DOWN, model.frame)
 
 
-def _center_text(y: int, text: str, col: int):
-    width = font.text_width(text) if font else len(text) * pyxel.FONT_WIDTH
+def _center_text(y: int, text: str, col: int, f=None):
+    width = f.text_width(text) if f else len(text) * pyxel.FONT_WIDTH
     x = (SCREEN_W - width) // 2
-    pyxel.text(x, y, text, col)
+    if f:
+        pyxel.text(x, y, text, col, f)
+    else:
+        pyxel.text(x, y, text, col)
 
 
 def view_death(model: Model):

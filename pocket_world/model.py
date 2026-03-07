@@ -65,6 +65,9 @@ def init() -> tuple[Model, list[Cmd]]:
         learned=(),
         death_timer=0,
         rewind_timer=0,
+        thought=None,
+        seen_memories=(),
+        thought_cooldown=0,
         show_minimap=False,
     )
     return model, []
