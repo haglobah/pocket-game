@@ -1,8 +1,17 @@
 import hashlib
 
 from .constants import (
-    MAP_W, MAP_H,
-    WATER, SAND, TREE, BUSH, TALL_GRASS, GRASS, FLOWERS, ROCK, DIRT,
+    MAP_W,
+    MAP_H,
+    WATER,
+    SAND,
+    TREE,
+    BUSH,
+    TALL_GRASS,
+    GRASS,
+    FLOWERS,
+    ROCK,
+    DIRT,
 )
 
 

@@ -2,12 +2,32 @@ import pyxel
 from pathlib import Path
 
 from .constants import (
-    SCREEN_W, SCREEN_H, TILE_SIZE, VIEWPORT_W, VIEWPORT_H, DEBUG_HEIGHT,
-    MAP_W, MAP_H,
-    WATER, GRASS, TALL_GRASS, FLOWERS, DIRT, SAND, TREE, ROCK, BUSH,
-    UP, DOWN, LEFT, RIGHT,
+    SCREEN_W,
+    SCREEN_H,
+    TILE_SIZE,
+    VIEWPORT_W,
+    VIEWPORT_H,
+    DEBUG_HEIGHT,
+    MAP_W,
+    MAP_H,
+    WATER,
+    GRASS,
+    TALL_GRASS,
+    FLOWERS,
+    DIRT,
+    SAND,
+    TREE,
+    ROCK,
+    BUSH,
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT,
     UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT, DIR_NAME,
-    LUNGS, O2_MAX, DEATH_SCREEN_MIN_FRAMES, REWIND_DURATION,
+    LUNGS,
+    O2_MAX,
+    DEATH_SCREEN_MIN_FRAMES,
+    REWIND_DURATION,
     THOUGHT_CHAR_SPEED,
 )
 from .model import Model, ThoughtBubble
@@ -332,7 +352,7 @@ def view_play(model: Model):
 
     # O2 bar
     underwater = model.tilemap[py][px] == WATER
-    can_auto_breathe = (model.breathing_mode == LUNGS and not underwater)
+    can_auto_breathe = model.breathing_mode == LUNGS and not underwater
     # Show bar unless lungs mode on land with full O2
     show_o2 = not (can_auto_breathe and model.o2 >= O2_MAX)
     if show_o2:
@@ -355,9 +375,15 @@ def view_play(model: Model):
     map_bottom = VIEWPORT_H * TILE_SIZE
     pyxel.rect(0, map_bottom, SCREEN_W, DEBUG_HEIGHT, 0)
     tile_name = {
-        GRASS: "grass", TALL_GRASS: "tall_grass", FLOWERS: "flowers",
-        DIRT: "dirt", WATER: "water", SAND: "sand",
-        TREE: "tree", ROCK: "rock", BUSH: "bush",
+        GRASS: "grass",
+        TALL_GRASS: "tall_grass",
+        FLOWERS: "flowers",
+        DIRT: "dirt",
+        WATER: "water",
+        SAND: "sand",
+        TREE: "tree",
+        ROCK: "rock",
+        BUSH: "bush",
     }
     standing_on = tile_name.get(model.tilemap[py][px], "?")
     y = map_bottom + 2

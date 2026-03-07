@@ -22,11 +22,14 @@ TREE = 6
 ROCK = 7
 BUSH = 8
 
+
 def is_walkable(tile: int) -> bool:
     return tile in (GRASS, TALL_GRASS, BUSH, FLOWERS, DIRT, SAND)
 
+
 def is_swimmable(tile: int) -> bool:
     return tile is WATER
+
 
 # Movement speed (frames between steps)
 MOVE_DELAY_WATER = 12

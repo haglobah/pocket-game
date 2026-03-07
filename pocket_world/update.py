@@ -1,24 +1,43 @@
 from dataclasses import replace
 
 from .constants import (
-    MAP_W, MAP_H, Point,
-    WATER, O2_MAX, O2_BREATHE_REFILL, O2_AUTO_REFILL_RATE,
-    O2_LUNGS_UNDERWATER_CHUNK, LUNGS, GILLS, DOWN,
-    MOVE_DELAY_LAND, MOVE_DELAY_WATER,
-    DEATH_SCREEN_MIN_FRAMES, REWIND_DURATION,
+    MAP_W,
+    MAP_H,
+    Point,
+    WATER,
+    O2_MAX,
+    O2_BREATHE_REFILL,
+    O2_AUTO_REFILL_RATE,
+    O2_LUNGS_UNDERWATER_CHUNK,
+    LUNGS,
+    GILLS,
+    DOWN,
+    MOVE_DELAY_LAND,
+    MOVE_DELAY_WATER,
+    DEATH_SCREEN_MIN_FRAMES,
+    REWIND_DURATION,
     THOUGHT_CHAR_SPEED, THOUGHT_READ_FRAMES,
     THOUGHT_COOLDOWN_FRAMES, THOUGHT_INITIAL_DELAY,
-    is_walkable, is_swimmable,
+    is_walkable,
+    is_swimmable,
 )
 from .model import Model, ThoughtBubble
 from .messages import (
-    Msg, Tick, MoveDir, StartGame, TypeChar, Backspace,
-    MapGenerated, Breathe, ToggleBreathingMode, Die,
-    DismissDeathScreen, RewindTick,
+    Msg,
+    Tick,
+    MoveDir,
+    StartGame,
+    TypeChar,
+    Backspace,
+    MapGenerated,
+    Breathe,
+    ToggleBreathingMode,
+    Die,
+    DismissDeathScreen,
+    RewindTick,
 )
 from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound
 from .thoughts import check_triggers, get_memory
-
 
 def init() -> tuple[Model, list[Cmd]]:
     model = Model(
@@ -71,16 +90,20 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
     match msg:
         case Tick():
             if model.state == "dead":
-                return replace(model, death_timer=model.death_timer + 1, frame=model.frame + 1), []
+                return replace(
+                    model, death_timer=model.death_timer + 1, frame=model.frame + 1
+                ), []
             new_o2 = model.o2
             new_thought = model.thought
             new_seen = model.seen_memories
             new_cooldown = model.thought_cooldown
             cmds: list[Cmd] = []
             if model.state == "play" and model.tilemap:
-                underwater = model.tilemap[model.player_pos.y][model.player_pos.x] == WATER
-                can_auto_breathe = (model.breathing_mode == LUNGS and not underwater)
-                lungs_underwater = (model.breathing_mode == LUNGS and underwater)
+                underwater = (
+                    model.tilemap[model.player_pos.y][model.player_pos.x] == WATER
+                )
+                can_auto_breathe = model.breathing_mode == LUNGS and not underwater
+                lungs_underwater = model.breathing_mode == LUNGS and underwater
                 if can_auto_breathe:
                     new_o2 = min(O2_MAX, new_o2 + O2_AUTO_REFILL_RATE)
                 elif lungs_underwater and model.frame % 60 == 0:
@@ -146,12 +169,18 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             new_pos = _wrap(Point(model.player_pos.x + d.x, model.player_pos.y + d.y))
             if is_walkable(model.tilemap[new_pos.y][new_pos.x]):
                 return replace(
-                    model, player_pos=new_pos, facing=d, move_timer=MOVE_DELAY_LAND,
+                    model,
+                    player_pos=new_pos,
+                    facing=d,
+                    move_timer=MOVE_DELAY_LAND,
                     learned=_add_learned(model, "walking on land"),
                 ), [PlayStepSound()]
             if is_swimmable(model.tilemap[new_pos.y][new_pos.x]):
                 return replace(
-                    model, player_pos=new_pos, facing=d, move_timer=MOVE_DELAY_WATER,
+                    model,
+                    player_pos=new_pos,
+                    facing=d,
+                    move_timer=MOVE_DELAY_WATER,
                     learned=_add_learned(model, "swimming"),
                 ), [PlaySwimSound()]
             return replace(model, facing=d, move_timer=0), []
@@ -164,13 +193,10 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             return replace(
                 model,
                 player_pos=spawn,
-                facing=DOWN,
                 tilemap=tm,
                 seed=s,
-                move_timer=0,
                 state="play",
                 o2=O2_MAX,
-                breathing_mode=GILLS,
                 learned=(),
                 death_reason="",
                 death_timer=0,
@@ -196,7 +222,8 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             if model.breathing_mode == GILLS and underwater:
                 new_o2 = min(O2_MAX, model.o2 + O2_BREATHE_REFILL)
                 return replace(
-                    model, o2=new_o2,
+                    model,
+                    o2=new_o2,
                     learned=_add_learned(model, "breathing underwater"),
                 ), []
             return model, []
@@ -205,19 +232,25 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             new_mode = GILLS if model.breathing_mode == LUNGS else LUNGS
             skill = "switching to lungs" if new_mode == LUNGS else "switching to gills"
             return replace(
-                model, breathing_mode=new_mode,
+                model,
+                breathing_mode=new_mode,
                 learned=_add_learned(model, skill),
             ), []
 
         case Die(reason=r):
             return replace(
-                model, state="dead", death_reason=r, death_timer=0,
+                model,
+                state="dead",
+                death_reason=r,
+                death_timer=0,
             ), []
 
         case DismissDeathScreen():
             if model.state == "dead" and model.death_timer >= DEATH_SCREEN_MIN_FRAMES:
                 return replace(
-                    model, state="rewind", rewind_timer=REWIND_DURATION,
+                    model,
+                    state="rewind",
+                    rewind_timer=REWIND_DURATION,
                 ), []
             return model, []
 
@@ -227,7 +260,8 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 if new_timer <= 0:
                     # Respawn with same seed, next cycle
                     return replace(
-                        model, state="play",
+                        model,
+                        state="play",
                         cycle=model.cycle + 1,
                         rewind_timer=0,
                     ), [GenerateMap(seed=model.seed)]

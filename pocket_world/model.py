@@ -1,6 +1,14 @@
 from dataclasses import dataclass
-
-from .constants import Point
+from .commands import Cmd
+from .constants import (
+    MAP_W,
+    MAP_H,
+    Point,
+    O2_MAX,
+    LUNGS,
+    GILLS,
+    DOWN,
+)
 
 
 @dataclass(frozen=True)
@@ -31,3 +39,24 @@ class Model:
     thought: ThoughtBubble | None
     seen_memories: tuple[str, ...]
     thought_cooldown: int
+
+
+def init() -> tuple[Model, list[Cmd]]:
+    model = Model(
+        player_pos=Point(MAP_W // 2, MAP_H // 2),
+        facing=DOWN,
+        tilemap=(),
+        seed=0,
+        move_timer=0,
+        state="title",
+        seed_input="",
+        frame=0,
+        o2=O2_MAX,
+        breathing_mode=LUNGS,
+        cycle=1,
+        death_reason="",
+        learned=(),
+        death_timer=0,
+        rewind_timer=0,
+    )
+    return model, []

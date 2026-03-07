@@ -5,13 +5,23 @@ import pyxel
 
 from .constants import SCREEN_W, SCREEN_H, Point
 from .messages import (
-    Msg, Tick, MoveDir, StartGame, TypeChar, Backspace, MapGenerated,
-    Breathe, ToggleBreathingMode, DismissDeathScreen, RewindTick,
+    Msg,
+    Tick,
+    MoveDir,
+    StartGame,
+    TypeChar,
+    Backspace,
+    MapGenerated,
+    Breathe,
+    ToggleBreathingMode,
+    DismissDeathScreen,
+    RewindTick,
 )
 from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound
 from .mapgen import generate_map
-from .update import init, update
+from .update import update
 from .view import view
+from .model import init
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -56,12 +66,18 @@ def define_sounds():
 class App:
     def __init__(self):
         pyxel.init(
-            SCREEN_W, SCREEN_H,
+            SCREEN_W,
+            SCREEN_H,
             title="Pocket World",
             fps=60,
             display_scale=1,
         )
-        pyxel.load(str(_PROJECT_ROOT / "pocket_world.pyxres"), exclude_sounds=True, exclude_musics=True, exclude_tilemaps=True)
+        pyxel.load(
+            str(_PROJECT_ROOT / "pocket_world.pyxres"),
+            exclude_sounds=True,
+            exclude_musics=True,
+            exclude_tilemaps=True,
+        )
         define_sounds()
         self.model, cmds = init()
         self._process_cmds(cmds)
@@ -80,7 +96,9 @@ class App:
             if pyxel.btnp(pyxel.KEY_RETURN):
                 seed_text = self.model.seed_input.strip()
                 if seed_text:
-                    seed = int(hashlib.md5(seed_text.encode()).hexdigest(), 16) % (2**31)
+                    seed = int(hashlib.md5(seed_text.encode()).hexdigest(), 16) % (
+                        2**31
+                    )
                 else:
                     seed = pyxel.rndi(0, 2**31 - 1)
                 msgs.append(StartGame(seed=seed))
