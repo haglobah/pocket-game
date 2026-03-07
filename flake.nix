@@ -2,7 +2,9 @@
   description = "A project by ?.";
 
   inputs = {
-    nixpkgs.url = "https://flakehub.com/f/DeterminateSystems/nixpkgs-weekly/*.tar.gz";
+    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+    pyxel.url = "github:haglobah/pyxel";
+    pyxel.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -44,7 +46,8 @@
             packages = with pkgs; [
               nixfmt
               just
-              pyxel
+              inputs'.pyxel.packages.default
+              ruff
               # (python3.withPackages (pp: [
               #   pp.pyxel # for example
               # ]))

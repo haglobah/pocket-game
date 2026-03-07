@@ -5,6 +5,11 @@
 tmp/
 .aider*
 
+__pycache__
+
 result*
 
+out*
 
+*.html
+*.pyxapp

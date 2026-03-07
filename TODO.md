@@ -30,13 +30,16 @@
 - [ ] Dehydration system — must drink water or die
 - [ ] Starvation system — must eat food or die
 - [ ] Death → respawn at spaceship wreck (time checkpoint machine)
-- [ ] Timer / cycle tracking (Cycle 1, Cycle 2, ...)
+- [ ] Timer — shown after death, displayed consistently once you reach 'world death' state (world death countdown)
 
-## Underwater Region (ideas — low priority)
-- [ ] Walking/swimming in water
-- [ ] Gill/lung mode toggle?
-- [ ] O2 bar that depletes?
-- [ ] Breathe keypress while in water?
+## Underwater Region (done / ideas)
+- [x] Walk/swim in water
+- [x] Gill/lung mode toggle on keypress
+- [x] O2 bar
+- [x] O2 bar depletes over time
+- [x] Breathe keypress when in water
+- [x] Die when no O2
+- [x] Reset on die
 
 # Abilities / Trials of Progression
 

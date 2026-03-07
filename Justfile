@@ -7,9 +7,12 @@ setup:
 
 dev args="":
 
-build args="":
+build:
+    pyxel package . pocket_world.py
+    pyxel app2html pocket.pyxapp
 
 run:
+    pyxel run pocket_world.py
 
 open cmd="":
     #!/usr/bin/env bash
