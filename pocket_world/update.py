@@ -265,8 +265,6 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 seed=s,
                 state="play",
                 o2=O2_MAX,
-                hydration=HYDRATION_MAX,
-                hunger=HUNGER_MAX,
                 learned=(),
                 death_reason="",
                 death_timer=0,
