@@ -45,8 +45,8 @@ MOVE_DELAY_LAND = 8
 MOVE_DELAY_RUNNING = 4
 
 # O2 system
-O2_MAX = 40 * 60  # 40 seconds at 60fps
-O2_BREATHE_REFILL = 20 * 60  # 20 seconds refill per key press
+O2_MAX = 20 * 60  # 40 seconds at 60fps
+O2_BREATHE_REFILL = 10 * 60  # 20 seconds refill per key press
 O2_AUTO_REFILL_RATE = 4  # frames of O2 restored per frame when auto-breathing
 
 # Breathing modes
