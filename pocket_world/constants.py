@@ -50,6 +50,20 @@ O2_BREATHE_REFILL = 10 * 60  # 20 seconds refill per key press
 O2_AUTO_REFILL_RATE = 4  # frames of O2 restored per frame when auto-breathing
 O2_LUNGS_UNDERWATER_CHUNK = 3 * 60  # 3 seconds of O2 lost per gulp (every second)
 
+# Hydration system
+HYDRATION_MAX = 45 * 60  # 45 seconds at 60fps
+HYDRATION_REFILL = 20 * 60  # 20 seconds per drink
+HYDRATION_DEPLETION = 1  # frames lost per frame
+
+# Hunger system
+HUNGER_MAX = 60 * 60  # 60 seconds at 60fps
+HUNGER_REFILL = 25 * 60  # 25 seconds per eat
+HUNGER_DEPLETION = 1  # frames lost per frame
+
+# Edible / drinkable tiles
+FOOD_TILES = (4, 5)  # PALM_TREE, CACTUS
+DRINK_TILES = (8,)  # WATER
+
 # Death screen / rewind
 DEATH_SCREEN_MIN_FRAMES = 60  # minimum frames before ENTER accepted
 REWIND_DURATION = 180  # 3 seconds at 60fps

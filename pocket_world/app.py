@@ -14,6 +14,8 @@ from .messages import (
     MapGenerated,
     Breathe,
     ToggleBreathingMode,
+    Drink,
+    Eat,
     DismissDeathScreen,
     RewindTick,
 )
@@ -120,6 +122,10 @@ class App:
                 msgs.append(Breathe())
             if pyxel.btnp(pyxel.KEY_B):
                 msgs.append(ToggleBreathingMode())
+            if pyxel.btnp(pyxel.KEY_Q):
+                msgs.append(Drink())
+            if pyxel.btnp(pyxel.KEY_E):
+                msgs.append(Eat())
 
         elif self.model.state == "dead":
             if pyxel.btnp(pyxel.KEY_RETURN):

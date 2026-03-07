@@ -26,6 +26,8 @@ from .constants import (
     UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT, DIR_NAME,
     LUNGS,
     O2_MAX,
+    HYDRATION_MAX,
+    HUNGER_MAX,
     DEATH_SCREEN_MIN_FRAMES,
     REWIND_DURATION,
     THOUGHT_CHAR_SPEED,
@@ -215,7 +217,6 @@ def view_title(model: Model):
     title = "POCKET WORLD"
     _center_text(260, title, 7, title_font)
 
-    # Seed input
     prompt = "Enter seed (or press ENTER for random):"
     _center_text(320, prompt, 13, ui_font)
 
@@ -225,15 +226,13 @@ def view_title(model: Model):
     hint = "[ENTER] Start"
     _center_text(390, hint, 6, ui_font)
 
-    # Draw the character as preview
     draw_character(SCREEN_W // 2 - 16, 210, DOWN, model.frame)
 
 
-def _center_text(y: int, text: str, col: int, font=None):
-    """Draw text centered horizontally."""
+def _center_text(y: int, text: str, col: int):
     width = font.text_width(text) if font else len(text) * pyxel.FONT_WIDTH
     x = (SCREEN_W - width) // 2
-    pyxel.text(x, y, text, col, font)
+    pyxel.text(x, y, text, col)
 
 
 def view_death(model: Model):
@@ -267,47 +266,33 @@ def view_death(model: Model):
 
 
 def _draw_hourglass(cx: int, cy: int, fill_frac: float):
-    """Draw a simple hourglass at center (cx, cy). fill_frac 0..1 = how full bottom is."""
-    # Outer frame
     hw, hh = 20, 40
-    # Top triangle (emptying)
-    top_fill = 1.0 - fill_frac
-    # Bottom triangle (filling)
     for i in range(hh):
-        # Width narrows toward middle
         if i < hh // 2:
             w = int(hw * (1 - i / (hh // 2)))
-            # Top half: sand only in upper portion
-            sand_h = int((hh // 2) * top_fill)
+            sand_h = int((hh // 2) * (1.0 - fill_frac))
             col = 9 if i < sand_h else 0
         else:
             j = i - hh // 2
             w = int(hw * (j / (hh // 2)))
-            # Bottom half: sand fills from bottom
             sand_h = int((hh // 2) * fill_frac)
             rows_from_bottom = hh - 1 - i
             col = 9 if rows_from_bottom < sand_h else 0
         if w > 0:
             pyxel.rect(cx - w, cy - hh // 2 + i, w * 2, 1, col)
-    # Frame lines
-    pyxel.line(cx - hw, cy - hh // 2, cx + hw, cy - hh // 2, 7)  # top
-    pyxel.line(cx - hw, cy + hh // 2, cx + hw, cy + hh // 2, 7)  # bottom
-    pyxel.line(cx - hw, cy - hh // 2, cx, cy, 7)  # top-left diagonal
-    pyxel.line(cx + hw, cy - hh // 2, cx, cy, 7)  # top-right diagonal
-    pyxel.line(cx - hw, cy + hh // 2, cx, cy, 7)  # bottom-left diagonal
-    pyxel.line(cx + hw, cy + hh // 2, cx, cy, 7)  # bottom-right diagonal
+    pyxel.line(cx - hw, cy - hh // 2, cx + hw, cy - hh // 2, 7)
+    pyxel.line(cx - hw, cy + hh // 2, cx + hw, cy + hh // 2, 7)
+    pyxel.line(cx - hw, cy - hh // 2, cx, cy, 7)
+    pyxel.line(cx + hw, cy - hh // 2, cx, cy, 7)
+    pyxel.line(cx - hw, cy + hh // 2, cx, cy, 7)
+    pyxel.line(cx + hw, cy + hh // 2, cx, cy, 7)
 
 
 def view_rewind(model: Model):
     pyxel.cls(0)
-    # fill_frac goes from 0 to 1 as rewind_timer counts down
     fill_frac = 1.0 - (model.rewind_timer / REWIND_DURATION)
-
     _draw_hourglass(SCREEN_W // 2, SCREEN_H // 2 - 20, fill_frac)
-
     _center_text(SCREEN_H // 2 + 50, "Rewinding...", 7)
-
-    # Cycle number
     _center_text(SCREEN_H // 2 + 70, f"Cycle {model.cycle + 1}", 13)
 
 
@@ -406,7 +391,6 @@ def view_play(model: Model):
     pyxel.cls(0)
     px, py = model.player_pos
 
-    # Camera centered on player
     cam_x = px - VIEWPORT_W // 2
     cam_y = py - VIEWPORT_H // 2
 
@@ -437,10 +421,21 @@ def view_play(model: Model):
         player_top = pcy
         _draw_thought_bubble(player_cx, player_top - 6, model.thought)
 
-    # O2 bar
+    # Status bars
+    bar_w = 100
+    bar_h = 6
+    bar_x = 10
+    bar_y = 10
+
+    def _draw_bar(y: int, frac: float, label: str, full_col: int, mid_col: int, low_col: int):
+        col = full_col if frac > 0.5 else (mid_col if frac > 0.25 else low_col)
+        pyxel.rect(bar_x - 1, y - 1, bar_w + 2, bar_h + 2, 0)
+        pyxel.rect(bar_x, y, int(bar_w * frac), bar_h, col)
+        pyxel.text(bar_x + bar_w + 4, y, label, 7)
+
+    # O2 bar (hidden when lungs on land and full)
     underwater = model.tilemap[py][px] == WATER
     can_auto_breathe = model.breathing_mode == LUNGS and not underwater
-    # Show bar unless lungs mode on land with full O2
     show_o2 = not (can_auto_breathe and model.o2 >= O2_MAX)
     if show_o2:
         hud_font = _get_hud_font()
@@ -457,10 +452,31 @@ def view_play(model: Model):
         # Label
         mode_label = "LUNGS" if model.breathing_mode == LUNGS else "GILLS"
         pyxel.text(bar_x + bar_w + 8, bar_y - 1, f"O2 [{mode_label}]", 7, hud_font)
+        _draw_bar(bar_y, model.o2 / O2_MAX, f"O2 [{mode_label}]", 11, 9, 8)
+        bar_y += bar_h + 4
+
+    # Hydration bar
+    _draw_bar(bar_y, model.hydration / HYDRATION_MAX, "Water [Q]", 12, 6, 8)
+    bar_y += bar_h + 4
+
+    # Hunger bar
+    _draw_bar(bar_y, model.hunger / HUNGER_MAX, "Food [E]", 11, 9, 8)
 
     # Debug panel below map
+    tile_names = {
+        SAND: "sand",
+        SAND_DARK: "dark_sand",
+        CLIFF: "cliff",
+        CLIFF_EDGE: "cliff_edge",
+        PALM_TREE: "palm",
+        CACTUS: "cactus",
+        DEAD_BUSH: "dead_bush",
+        ROCK: "rock",
+        WATER: "water",
+    }
     map_bottom = VIEWPORT_H * TILE_SIZE
     pyxel.rect(0, map_bottom, SCREEN_W, DEBUG_HEIGHT, 0)
+    dir_name = {UP: "UP", DOWN: "DOWN", LEFT: "LEFT", RIGHT: "RIGHT"}
     tile_name = {
         GRASS: "grass",
         TALL_GRASS: "tall_grass",
@@ -478,7 +494,7 @@ def view_play(model: Model):
         f"seed:{model.seed}  state:{model.state}",
         f"pos:({px},{py})  facing:{DIR_NAME.get(model.facing, '?')}  tile:{standing_on}",
         f"move_timer:{model.move_timer}  frame:{model.frame}",
-        f"map:{MAP_W}x{MAP_H}  o2:{model.o2 // 60}s  mode:{model.breathing_mode}",
+        f"o2:{model.o2 // 60}s  water:{model.hydration // 60}s  food:{model.hunger // 60}s  mode:{model.breathing_mode}",
     ]
     for line in lines:
         pyxel.text(2, y, line, 7)

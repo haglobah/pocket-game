@@ -8,6 +8,8 @@ from .constants import (
     LUNGS,
     GILLS,
     DOWN,
+    HYDRATION_MAX,
+    HUNGER_MAX,
 )
 
 
@@ -31,6 +33,8 @@ class Model:
     frame: int  # animation frame counter
     o2: int  # O2 in frames remaining (max O2_MAX)
     breathing_mode: str  # LUNGS or GILLS
+    hydration: int  # hydration in frames remaining (max HYDRATION_MAX)
+    hunger: int  # hunger in frames remaining (max HUNGER_MAX)
     cycle: int  # current cycle number (starts at 1)
     death_reason: str  # reason of death for death screen
     learned: tuple[str, ...]  # skills learned this cycle
@@ -53,6 +57,8 @@ def init() -> tuple[Model, list[Cmd]]:
         frame=0,
         o2=O2_MAX,
         breathing_mode=LUNGS,
+        hydration=HYDRATION_MAX,
+        hunger=HUNGER_MAX,
         cycle=1,
         death_reason="",
         learned=(),

@@ -18,6 +18,14 @@ from .constants import (
     REWIND_DURATION,
     THOUGHT_CHAR_SPEED, THOUGHT_READ_FRAMES,
     THOUGHT_COOLDOWN_FRAMES, THOUGHT_INITIAL_DELAY,
+    HYDRATION_MAX,
+    HYDRATION_REFILL,
+    HYDRATION_DEPLETION,
+    HUNGER_MAX,
+    HUNGER_REFILL,
+    HUNGER_DEPLETION,
+    FOOD_TILES,
+    DRINK_TILES,
     is_walkable,
     is_swimmable,
 )
@@ -32,6 +40,8 @@ from .messages import (
     MapGenerated,
     Breathe,
     ToggleBreathingMode,
+    Drink,
+    Eat,
     Die,
     DismissDeathScreen,
     RewindTick,
@@ -126,6 +136,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     new_o2 = max(0, new_o2 - O2_LUNGS_UNDERWATER_CHUNK)
                 else:
                     new_o2 = max(0, new_o2 - 1)
+                # Check for O2 death
                 if new_o2 <= 0:
                     if model.breathing_mode == LUNGS and underwater:
                         reason = "Drowned (lungs underwater)"
@@ -141,7 +152,6 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                         death_reason=reason,
                         death_timer=0,
                     ), []
-
                 # Thought bubble management
                 new_cooldown = max(0, new_cooldown - 1)
                 if new_thought is not None:
@@ -166,6 +176,32 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                         )
                         cmds.append(PlayThoughtSound())
 
+            # Deplete hydration and hunger
+            new_hydration = max(0, model.hydration - HYDRATION_DEPLETION)
+            new_hunger = max(0, model.hunger - HUNGER_DEPLETION)
+            if model.state == "play":
+                if new_hydration <= 0:
+                    return replace(
+                        model,
+                        frame=model.frame + 1,
+                        hydration=0,
+                        hunger=new_hunger,
+                        o2=new_o2,
+                        state="dead",
+                        death_reason="Died of dehydration",
+                        death_timer=0,
+                    ), []
+                if new_hunger <= 0:
+                    return replace(
+                        model,
+                        frame=model.frame + 1,
+                        hunger=0,
+                        hydration=new_hydration,
+                        o2=new_o2,
+                        state="dead",
+                        death_reason="Died of starvation",
+                        death_timer=0,
+                    ), []
             return replace(
                 model,
                 move_timer=max(0, model.move_timer - 1),
@@ -174,6 +210,8 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 thought=new_thought,
                 seen_memories=new_seen,
                 thought_cooldown=new_cooldown,
+                hydration=new_hydration,
+                hunger=new_hunger,
             ), cmds
 
         case MoveDir(direction=d):
@@ -182,7 +220,8 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             if model.move_timer > 0:
                 # Still in cooldown, just update facing
                 return replace(model, facing=d), []
-            new_pos = _wrap(Point(model.player_pos.x + d.x, model.player_pos.y + d.y))
+            raw = Point(model.player_pos.x + d.x, model.player_pos.y + d.y)
+            new_pos = Point(raw.x % MAP_W, raw.y % MAP_H)
             if is_walkable(model.tilemap[new_pos.y][new_pos.x]):
                 return replace(
                     model,
@@ -213,6 +252,8 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 seed=s,
                 state="play",
                 o2=O2_MAX,
+                hydration=HYDRATION_MAX,
+                hunger=HUNGER_MAX,
                 learned=(),
                 death_reason="",
                 death_timer=0,
@@ -252,6 +293,34 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 breathing_mode=new_mode,
                 learned=_add_learned(model, skill),
             ), []
+
+        case Drink():
+            if model.state != "play" or not model.tilemap:
+                return model, []
+            nearby = _adjacent_tiles(model.player_pos, model.tilemap)
+            standing = model.tilemap[model.player_pos.y][model.player_pos.x]
+            if standing in DRINK_TILES or any(t in DRINK_TILES for t in nearby):
+                new_hydration = min(HYDRATION_MAX, model.hydration + HYDRATION_REFILL)
+                return replace(
+                    model,
+                    hydration=new_hydration,
+                    learned=_add_learned(model, "drinking water"),
+                ), []
+            return model, []
+
+        case Eat():
+            if model.state != "play" or not model.tilemap:
+                return model, []
+            nearby = _adjacent_tiles(model.player_pos, model.tilemap)
+            standing = model.tilemap[model.player_pos.y][model.player_pos.x]
+            if standing in FOOD_TILES or any(t in FOOD_TILES for t in nearby):
+                new_hunger = min(HUNGER_MAX, model.hunger + HUNGER_REFILL)
+                return replace(
+                    model,
+                    hunger=new_hunger,
+                    learned=_add_learned(model, "eating plants"),
+                ), []
+            return model, []
 
         case Die(reason=r):
             return replace(
