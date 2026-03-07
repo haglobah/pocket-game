@@ -62,7 +62,7 @@ HYDRATION_DEPLETION = 1  # frames lost per frame
 
 # Hunger system
 HUNGER_MAX = 10 * 60 * 60  # 10 min at 60fps
-HUNGER_MAX = 3 * 60 * 60  # 10 min at 60fps
+HUNGER_START = 3 * 60 * 60  # 10 min at 60fps
 HUNGER_REFILL = 5 * 60 * 60  # 5 min per eat
 HUNGER_DEPLETION = 1  # frames lost per frame
 

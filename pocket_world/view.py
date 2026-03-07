@@ -284,11 +284,11 @@ def draw_character(sx: int, sy: int, facing, frame: int):
 
 
 def view(model: Model):
-    if model.state == "title":
+    if model.game.state == "title":
         view_title(model)
-    elif model.state == "dead":
+    elif model.game.state == "dead":
         view_death(model)
-    elif model.state == "rewind":
+    elif model.game.state == "rewind":
         view_rewind(model)
     else:
         view_play(model)
@@ -306,13 +306,13 @@ def view_title(model: Model):
     prompt = "Enter seed (or press ENTER for random):"
     _center_text(320, prompt, 13, ui_font)
 
-    input_text = model.seed_input + ("_" if (model.frame // 20) % 2 == 0 else " ")
+    input_text = model.game.seed_input + ("_" if (model.game.frame // 20) % 2 == 0 else " ")
     _center_text(350, input_text, 7, ui_font)
 
     hint = "[ENTER] Start"
     _center_text(390, hint, 6, ui_font)
 
-    draw_character(SCREEN_W // 2 - 16, 210, DOWN, model.frame)
+    draw_character(SCREEN_W // 2 - 16, 210, DOWN, model.game.frame)
 
 
 def _center_text(y: int, text: str, col: int, f=None):
@@ -329,27 +329,27 @@ def view_death(model: Model):
     ui_font = _get_ui_font()
     y = 120
 
-    _center_text(y, f"Cycle {model.cycle} -- You died", 8, ui_font)
+    _center_text(y, f"Cycle {model.cycle.number} -- You died", 8, ui_font)
     y += 36
 
-    _center_text(y, f"Seed: {model.seed}", 13, ui_font)
+    _center_text(y, f"Seed: {model.map.seed}", 13, ui_font)
     y += 26
 
-    _center_text(y, f"Reason: {model.death_reason}", 8, ui_font)
+    _center_text(y, f"Reason: {model.cycle.death_reason}", 8, ui_font)
     y += 42
 
-    if model.learned:
+    if model.cycle.learned:
         _center_text(y, "In this cycle, you learned:", 7, ui_font)
         y += 22
-        for skill in model.learned:
+        for skill in model.cycle.learned:
             _center_text(y, f"- {skill}", 11, ui_font)
             y += 18
     else:
         _center_text(y, "You didn't learn anything this cycle.", 13, ui_font)
     y += 30
 
-    if model.death_timer >= DEATH_SCREEN_MIN_FRAMES:
-        blink = (model.death_timer // 30) % 2 == 0
+    if model.cycle.death_timer >= DEATH_SCREEN_MIN_FRAMES:
+        blink = (model.cycle.death_timer // 30) % 2 == 0
         if blink:
             _center_text(y, "[ENTER] Continue", 7, ui_font)
 
@@ -379,10 +379,10 @@ def _draw_hourglass(cx: int, cy: int, fill_frac: float):
 
 def view_rewind(model: Model):
     pyxel.cls(0)
-    fill_frac = 1.0 - (model.rewind_timer / REWIND_DURATION)
+    fill_frac = 1.0 - (model.cycle.rewind_timer / REWIND_DURATION)
     _draw_hourglass(SCREEN_W // 2, SCREEN_H // 2 - 20, fill_frac)
     _center_text(SCREEN_H // 2 + 50, "Rewinding...", 7)
-    _center_text(SCREEN_H // 2 + 70, f"Cycle {model.cycle + 1}", 13)
+    _center_text(SCREEN_H // 2 + 70, f"Cycle {model.cycle.number + 1}", 13)
 
 
 def _wrap_text(text: str, max_chars: int) -> list[str]:
@@ -479,16 +479,16 @@ def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
 def _ensure_minimap(model: Model):
     """Write minimap to image bank 2 if not already cached for this seed."""
     global _minimap_cache_seed
-    if _minimap_cache_seed == model.seed:
+    if _minimap_cache_seed == model.map.seed:
         return
     img = pyxel.images[2]
     for my in range(MINIMAP_H):
         ty = my * MINIMAP_SCALE
         for mx in range(MINIMAP_W):
             tx = mx * MINIMAP_SCALE
-            tile = model.tilemap[ty][tx]
+            tile = model.map.tilemap[ty][tx]
             img.pset(mx, my, _MINIMAP_COLORS.get(tile, 0))
-    _minimap_cache_seed = model.seed
+    _minimap_cache_seed = model.map.seed
 
 
 def _draw_minimap(model: Model):
@@ -503,9 +503,9 @@ def _draw_minimap(model: Model):
     # Blit the precomputed minimap from image bank 2
     pyxel.blt(mx, my, 2, 0, 0, MINIMAP_W, MINIMAP_H)
     # Player dot (blinking)
-    px = model.player_pos.x // MINIMAP_SCALE
-    py = model.player_pos.y // MINIMAP_SCALE
-    dot_col = 8 if (model.frame // 15) % 2 == 0 else 7
+    px = model.player.pos.x // MINIMAP_SCALE
+    py = model.player.pos.y // MINIMAP_SCALE
+    dot_col = 8 if (model.game.frame // 15) % 2 == 0 else 7
     pyxel.rect(mx + px - 1, my + py - 1, 3, 3, dot_col)
     # Label
     pyxel.text(
@@ -515,12 +515,12 @@ def _draw_minimap(model: Model):
 
 def view_play(model: Model):
     pyxel.cls(0)
-    px, py = model.player_pos
+    px, py = model.player.pos
 
     cam_x = px - VIEWPORT_W // 2
     cam_y = py - VIEWPORT_H // 2
 
-    underwater = is_swimmable(model.tilemap[py][px])
+    underwater = is_swimmable(model.map.tilemap[py][px])
 
     for sy in range(VIEWPORT_H):
         for sx in range(VIEWPORT_W):
@@ -530,22 +530,22 @@ def view_play(model: Model):
             if tx < 0 or tx >= MAP_W or ty < 0 or ty >= MAP_H:
                 pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 0)
                 continue
-            tile = model.tilemap[ty][tx]
+            tile = model.map.tilemap[ty][tx]
             if underwater and not is_swimmable(tile):
                 pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 1)
             else:
-                draw_tile(sx * TILE_SIZE, sy * TILE_SIZE, tile, model.frame)
+                draw_tile(sx * TILE_SIZE, sy * TILE_SIZE, tile, model.game.frame)
 
     # Draw player at center of screen
     pcx = (VIEWPORT_W // 2) * TILE_SIZE
     pcy = (VIEWPORT_H // 2) * TILE_SIZE
-    draw_character(pcx, pcy, model.facing, model.frame)
+    draw_character(pcx, pcy, model.player.facing, model.game.frame)
 
     # Thought bubble above player
-    if model.thought is not None:
+    if model.game.thought is not None:
         player_cx = pcx + TILE_SIZE // 2
         player_top = pcy
-        _draw_thought_bubble(player_cx, player_top - 6, model.thought)
+        _draw_thought_bubble(player_cx, player_top - 6, model.game.thought)
 
     # Status bars
     bar_w = 100
@@ -562,36 +562,36 @@ def view_play(model: Model):
         pyxel.text(bar_x + bar_w + 4, y, label, 7)
 
     # O2 bar (hidden when lungs on land and full)
-    underwater = is_swimmable(model.tilemap[py][px])
-    can_auto_breathe = model.breathing_mode == LUNGS and not underwater
-    show_o2 = not (can_auto_breathe and model.o2 >= O2_MAX)
+    underwater = is_swimmable(model.map.tilemap[py][px])
+    can_auto_breathe = model.player.breathing_mode == LUNGS and not underwater
+    show_o2 = not (can_auto_breathe and model.player.o2 >= O2_MAX)
     if show_o2:
         hud_font = _get_hud_font()
         bar_w = 140
         bar_h = 12
         bar_x = (SCREEN_W - bar_w) // 2
         bar_y = 10
-        o2_frac = model.o2 / O2_MAX
+        o2_frac = model.player.o2 / O2_MAX
         # Background
         pyxel.rect(bar_x - 1, bar_y - 1, bar_w + 2, bar_h + 2, 0)
         # Fill — color based on level
         fill_color = 11 if o2_frac > 0.5 else (9 if o2_frac > 0.25 else 8)
         pyxel.rect(bar_x, bar_y, int(bar_w * o2_frac), bar_h, fill_color)
         # Label
-        mode_label = "LUNGS" if model.breathing_mode == LUNGS else "GILLS"
+        mode_label = "LUNGS" if model.player.breathing_mode == LUNGS else "GILLS"
         pyxel.text(bar_x + bar_w + 8, bar_y - 1, f"O2 [{mode_label}]", 7, hud_font)
-        _draw_bar(bar_y, model.o2 / O2_MAX, f"O2 [{mode_label}]", 11, 9, 8)
+        _draw_bar(bar_y, model.player.o2 / O2_MAX, f"O2 [{mode_label}]", 11, 9, 8)
         bar_y += bar_h + 4
 
     # Hydration bar
-    _draw_bar(bar_y, model.hydration / HYDRATION_MAX, "Water [Q]", 12, 6, 8)
+    _draw_bar(bar_y, model.player.hydration / HYDRATION_MAX, "Water [Q]", 12, 6, 8)
     bar_y += bar_h + 4
 
     # Hunger bar
-    _draw_bar(bar_y, model.hunger / HUNGER_MAX, "Food [E]", 11, 9, 8)
+    _draw_bar(bar_y, model.player.hunger / HUNGER_MAX, "Food [E]", 11, 9, 8)
 
     # Minimap overlay
-    if model.show_minimap:
+    if model.game.show_minimap:
         _draw_minimap(model)
 
     # Debug panel below map
@@ -624,13 +624,13 @@ def view_play(model: Model):
         ROCK: "rock",
         BUSH: "bush",
     }
-    standing_on = tile_name.get(model.tilemap[py][px], "?")
+    standing_on = tile_name.get(model.map.tilemap[py][px], "?")
     y = map_bottom + 2
     lines = [
-        f"seed:{model.seed}  state:{model.state}",
-        f"pos:({px},{py})  facing:{DIR_NAME.get(model.facing, '?')}  tile:{standing_on}",
-        f"move_timer:{model.move_timer}  frame:{model.frame}",
-        f"o2:{model.o2 // 60}s  water:{model.hydration // 60}s  food:{model.hunger // 60}s  mode:{model.breathing_mode}",
+        f"seed:{model.map.seed}  state:{model.game.state}",
+        f"pos:({px},{py})  facing:{DIR_NAME.get(model.player.facing, '?')}  tile:{standing_on}",
+        f"move_timer:{model.player.move_timer}  frame:{model.game.frame}",
+        f"o2:{model.player.o2 // 60}s  water:{model.player.hydration // 60}s  food:{model.player.hunger // 60}s  mode:{model.player.breathing_mode}",
     ]
     for line in lines:
         pyxel.text(2, y, line, 7)
