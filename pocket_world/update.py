@@ -26,6 +26,8 @@ from .constants import (
     HYDRATION_MAX,
     HYDRATION_REFILL,
     HYDRATION_DEPLETION,
+    HYDRATION_START,
+    HUNGER_START,
     HUNGER_MAX,
     HUNGER_REFILL,
     HUNGER_DEPLETION,
@@ -221,7 +223,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
         case MapGenerated(tilemap=tm, seed=s):
             spawn = _find_spawn(tm)
             return replace(model,
-                player=replace(player, pos=spawn),
+                player=replace(player, pos=spawn, hydration=HYDRATION_START, hunger=HUNGER_START),
                 map=Map(tilemap=tm, seed=s),
                 cycle=replace(cycle, death_reason="", death_timer=0, rewind_timer=0, learned=()),
                 game=replace(game,
