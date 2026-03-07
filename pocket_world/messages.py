@@ -77,3 +77,8 @@ class ToggleMinimap(Msg):
 @dataclass(frozen=True)
 class RewindTick(Msg):
     pass
+
+
+@dataclass(frozen=True)
+class SetSprinting(Msg):
+    active: bool
