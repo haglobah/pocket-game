@@ -32,9 +32,17 @@ SAND = 5
 TREE = 6
 ROCK = 7
 BUSH = 8
+def is_walkable(tile: int) -> bool:
+    return tile in (GRASS, TALL_GRASS, BUSH, FLOWERS, DIRT, SAND)
+
+def is_swimmable(tile: int) -> bool:
+    return tile is WATER
+
 
 # Movement speed (frames between steps)
-MOVE_DELAY = 4
+MOVE_DELAY_WATER = 12
+MOVE_DELAY_LAND = 8
+MOVE_DELAY_RUNNING = 4
 
 # Directions
 UP = Point(0, -1)
@@ -116,13 +124,6 @@ def generate_map(seed: int) -> tuple[tuple[int, ...], ...]:
         rows.append(tuple(row))
     return tuple(rows)
 
-
-def is_walkable(tile: int) -> bool:
-    return tile not in (TREE, ROCK)
-
-def is_swimmable(tile: int) -> bool:
-    return tile is WATER
-
 ###########
 # Model   #
 ###########
@@ -200,6 +201,10 @@ class GenerateMap(Cmd):
 class PlayStepSound(Cmd):
     pass
 
+@dataclass(frozen=True)
+class PlaySwimSound(Cmd):
+    pass
+
 
 ################
 # Init/Update  #
@@ -252,12 +257,15 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 # Still in cooldown, just update facing
                 return replace(model, facing=d), []
             new_pos = _wrap(Point(model.player_pos.x + d.x, model.player_pos.y + d.y))
-            if not (is_walkable(model.tilemap[new_pos.y][new_pos.x])
-                or is_swimmable(model.tilemap[new_pos.y][new_pos.x])):
-                return replace(model, facing=d, move_timer=0), []
-            return replace(
-                model, player_pos=new_pos, facing=d, move_timer=MOVE_DELAY,
-            ), [PlayStepSound()]
+            if is_walkable(model.tilemap[new_pos.y][new_pos.x]):
+                return replace(
+                    model, player_pos=new_pos, facing=d, move_timer=MOVE_DELAY_LAND,
+                ), [PlayStepSound()]
+            if is_swimmable(model.tilemap[new_pos.y][new_pos.x]):
+                return replace(
+                    model, player_pos=new_pos, facing=d, move_timer=MOVE_DELAY_WATER,
+                ), [PlaySwimSound()]
+            return replace(model, facing=d, move_timer=0), []
 
         case StartGame(seed=s):
             return model, [GenerateMap(seed=s)]
@@ -298,6 +306,8 @@ def interpret_cmd(cmd: Cmd) -> list[Msg]:
             tm = generate_map(s)
             return [MapGenerated(tilemap=tm, seed=s)]
         case PlayStepSound():
+            pyxel.play(3, 0)
+        case PlaySwimSound():
             pyxel.play(3, 0)
     return []
 
