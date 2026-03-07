@@ -1,6 +1,6 @@
 """Pocket World — A tiny creature explores a wrapping 100x100 tile world."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from collections import namedtuple
 import hashlib
 
@@ -118,8 +118,10 @@ def generate_map(seed: int) -> tuple[tuple[int, ...], ...]:
 
 
 def is_walkable(tile: int) -> bool:
-    return tile not in (WATER, TREE, ROCK)
+    return tile not in (TREE, ROCK)
 
+def is_swimmable(tile: int) -> bool:
+    return tile is WATER
 
 ###########
 # Model   #
@@ -229,7 +231,7 @@ def _find_spawn(tilemap: tuple[tuple[int, ...], ...]) -> Point:
         for dx in range(-r, r + 1):
             for dy in range(-r, r + 1):
                 p = _wrap(Point(cx + dx, cy + dy))
-                if is_walkable(tilemap[p.y][p.x]):
+                if is_swimmable(tilemap[p.y][p.x]):
                     return p
     return Point(cx, cy)
 
@@ -237,17 +239,10 @@ def _find_spawn(tilemap: tuple[tuple[int, ...], ...]) -> Point:
 def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
     match msg:
         case Tick():
-            new_timer = max(0, model.move_timer - 1)
-            new_frame = model.frame + 1
-            return Model(
-                player_pos=model.player_pos,
-                facing=model.facing,
-                tilemap=model.tilemap,
-                seed=model.seed,
-                move_timer=new_timer,
-                state=model.state,
-                seed_input=model.seed_input,
-                frame=new_frame,
+            return replace(
+                model,
+                move_timer=max(0, model.move_timer - 1),
+                frame=model.frame + 1,
             ), []
 
         case MoveDir(direction=d):
@@ -255,37 +250,13 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 return model, []
             if model.move_timer > 0:
                 # Still in cooldown, just update facing
-                return Model(
-                    player_pos=model.player_pos,
-                    facing=d,
-                    tilemap=model.tilemap,
-                    seed=model.seed,
-                    move_timer=model.move_timer,
-                    state=model.state,
-                    seed_input=model.seed_input,
-                    frame=model.frame,
-                ), []
+                return replace(model, facing=d), []
             new_pos = _wrap(Point(model.player_pos.x + d.x, model.player_pos.y + d.y))
-            if not is_walkable(model.tilemap[new_pos.y][new_pos.x]):
-                return Model(
-                    player_pos=model.player_pos,
-                    facing=d,
-                    tilemap=model.tilemap,
-                    seed=model.seed,
-                    move_timer=0,
-                    state=model.state,
-                    seed_input=model.seed_input,
-                    frame=model.frame,
-                ), []
-            return Model(
-                player_pos=new_pos,
-                facing=d,
-                tilemap=model.tilemap,
-                seed=model.seed,
-                move_timer=MOVE_DELAY,
-                state=model.state,
-                seed_input=model.seed_input,
-                frame=model.frame,
+            if not (is_walkable(model.tilemap[new_pos.y][new_pos.x])
+                or is_swimmable(model.tilemap[new_pos.y][new_pos.x])):
+                return replace(model, facing=d, move_timer=0), []
+            return replace(
+                model, player_pos=new_pos, facing=d, move_timer=MOVE_DELAY,
             ), [PlayStepSound()]
 
         case StartGame(seed=s):
@@ -293,43 +264,24 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
 
         case MapGenerated(tilemap=tm, seed=s):
             spawn = _find_spawn(tm)
-            return Model(
+            return replace(
+                model,
                 player_pos=spawn,
                 facing=DOWN,
                 tilemap=tm,
                 seed=s,
                 move_timer=0,
                 state="play",
-                seed_input=model.seed_input,
-                frame=model.frame,
             ), []
 
         case TypeChar(char=c):
             if model.state == "title" and len(model.seed_input) < 16:
-                return Model(
-                    player_pos=model.player_pos,
-                    facing=model.facing,
-                    tilemap=model.tilemap,
-                    seed=model.seed,
-                    move_timer=model.move_timer,
-                    state=model.state,
-                    seed_input=model.seed_input + c,
-                    frame=model.frame,
-                ), []
+                return replace(model, seed_input=model.seed_input + c), []
             return model, []
 
         case Backspace():
             if model.state == "title" and model.seed_input:
-                return Model(
-                    player_pos=model.player_pos,
-                    facing=model.facing,
-                    tilemap=model.tilemap,
-                    seed=model.seed,
-                    move_timer=model.move_timer,
-                    state=model.state,
-                    seed_input=model.seed_input[:-1],
-                    frame=model.frame,
-                ), []
+                return replace(model, seed_input=model.seed_input[:-1]), []
             return model, []
 
     return model, []
