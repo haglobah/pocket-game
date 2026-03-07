@@ -5,6 +5,8 @@ from .constants import (
     MAP_H,
     Point,
     WATER,
+    WATER_DEEP,
+    is_swimmable,
     O2_MAX,
     O2_BREATHE_REFILL,
     O2_AUTO_REFILL_RATE,
@@ -14,6 +16,7 @@ from .constants import (
     DOWN,
     MOVE_DELAY_LAND,
     MOVE_DELAY_WATER,
+    MOVE_DELAY_RUNNING,
     DEATH_SCREEN_MIN_FRAMES,
     REWIND_DURATION,
     THOUGHT_CHAR_SPEED,
@@ -48,6 +51,7 @@ from .messages import (
     Die,
     DismissDeathScreen,
     RewindTick,
+    SetSprinting,
 )
 from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound
 from .thoughts import check_triggers, get_memory
@@ -73,6 +77,7 @@ def init() -> tuple[Model, list[Cmd]]:
         thought=None,
         seen_memories=(),
         thought_cooldown=0,
+        sprinting=False,
     )
     return model, []
 
@@ -130,7 +135,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             cmds: list[Cmd] = []
             if model.state == "play" and model.tilemap:
                 underwater = (
-                    model.tilemap[model.player_pos.y][model.player_pos.x] == WATER
+                    is_swimmable(model.tilemap[model.player_pos.y][model.player_pos.x])
                 )
                 can_auto_breathe = model.breathing_mode == LUNGS and not underwater
                 lungs_underwater = model.breathing_mode == LUNGS and underwater
@@ -229,12 +234,14 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             raw = Point(model.player_pos.x + d.x, model.player_pos.y + d.y)
             new_pos = Point(raw.x % MAP_W, raw.y % MAP_H)
             if is_walkable(model.tilemap[new_pos.y][new_pos.x]):
+                delay = MOVE_DELAY_RUNNING if model.sprinting else MOVE_DELAY_LAND
+                skill = "sprinting" if model.sprinting else "walking on land"
                 return replace(
                     model,
                     player_pos=new_pos,
                     facing=d,
-                    move_timer=MOVE_DELAY_LAND,
-                    learned=_add_learned(model, "walking on land"),
+                    move_timer=delay,
+                    learned=_add_learned(model, skill),
                 ), [PlayStepSound()]
             if is_swimmable(model.tilemap[new_pos.y][new_pos.x]):
                 return replace(
@@ -281,7 +288,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
         case Breathe():
             if model.state != "play" or not model.tilemap:
                 return model, []
-            underwater = model.tilemap[model.player_pos.y][model.player_pos.x] == WATER
+            underwater = is_swimmable(model.tilemap[model.player_pos.y][model.player_pos.x])
             if model.breathing_mode == GILLS and underwater:
                 new_o2 = min(O2_MAX, model.o2 + O2_BREATHE_REFILL)
                 return replace(
@@ -349,6 +356,9 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     rewind_timer=REWIND_DURATION,
                 ), []
             return model, []
+
+        case SetSprinting(active=a):
+            return replace(model, sprinting=a), []
 
         case RewindTick():
             if model.state == "rewind":

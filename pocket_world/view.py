@@ -11,6 +11,8 @@ from .constants import (
     MAP_W,
     MAP_H,
     WATER,
+    WATER_DEEP,
+    is_swimmable,
     SAND,
     SAND_DARK,
     CLIFF,
@@ -19,6 +21,9 @@ from .constants import (
     CACTUS,
     DEAD_BUSH,
     ROCK,
+    BUSH_GREEN,
+    BUSH_FLOWERING,
+    BUSH_BERRY,
     GRASS,
     TALL_GRASS,
     FLOWERS,
@@ -109,6 +114,10 @@ _MINIMAP_COLORS = {
     DEAD_BUSH: 9,
     ROCK: 13,
     WATER: 5,
+    WATER_DEEP: 1,
+    BUSH_GREEN: 3,
+    BUSH_FLOWERING: 14,
+    BUSH_BERRY: 8,
 }
 
 # Cache the seed for which image bank 2 has been written
@@ -201,7 +210,7 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
         pyxel.circ(sx + 14, sy + 20, 6, 7)
         pyxel.circ(sx + 18, sy + 24, 5, 5)
     elif tile == WATER:
-        # Water (keeping for potential oases)
+        # Shallow oasis water — light blue with wave lines
         water_frame = (frame // 80) % 4
         c1, c2 = 5, 12
         if water_frame % 2 == 0:
@@ -210,6 +219,51 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
         for i in range(3):
             wy = sy + 6 + i * 10 + (water_frame * 3) % 8
             pyxel.line(sx + 4, wy, sx + 28, wy, c2)
+    elif tile == WATER_DEEP:
+        # Deep oasis water — darker blue/indigo
+        water_frame = (frame // 100) % 4
+        c1, c2 = 1, 5
+        if water_frame % 2 == 0:
+            c1, c2 = c2, c1
+        pyxel.rect(sx, sy, 32, 32, c1)
+        for i in range(2):
+            wy = sy + 8 + i * 14 + (water_frame * 4) % 10
+            pyxel.line(sx + 6, wy, sx + 26, wy, c2)
+    elif tile == BUSH_GREEN:
+        # Lush green bush on sand
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Bush body
+        pyxel.circ(sx + 16, sy + 20, 9, 3)
+        pyxel.circ(sx + 12, sy + 18, 7, 11)
+        pyxel.circ(sx + 20, sy + 17, 6, 3)
+        pyxel.circ(sx + 16, sy + 14, 5, 11)
+    elif tile == BUSH_FLOWERING:
+        # Flowering bush — green with pink/yellow flowers
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Bush body
+        pyxel.circ(sx + 16, sy + 20, 9, 3)
+        pyxel.circ(sx + 12, sy + 17, 6, 11)
+        pyxel.circ(sx + 20, sy + 17, 6, 3)
+        # Flowers
+        pyxel.circ(sx + 10, sy + 15, 2, 14)
+        pyxel.circ(sx + 18, sy + 13, 2, 10)
+        pyxel.circ(sx + 22, sy + 16, 2, 14)
+        pyxel.circ(sx + 14, sy + 12, 2, 10)
+        pyxel.pset(sx + 10, sy + 15, 7)
+        pyxel.pset(sx + 18, sy + 13, 7)
+    elif tile == BUSH_BERRY:
+        # Berry bush — green with red/purple berries
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Bush body
+        pyxel.circ(sx + 16, sy + 20, 9, 11)
+        pyxel.circ(sx + 12, sy + 17, 7, 3)
+        pyxel.circ(sx + 20, sy + 18, 6, 11)
+        # Berries
+        pyxel.circ(sx + 10, sy + 16, 2, 8)
+        pyxel.circ(sx + 15, sy + 14, 2, 2)
+        pyxel.circ(sx + 21, sy + 15, 2, 8)
+        pyxel.circ(sx + 13, sy + 20, 2, 2)
+        pyxel.circ(sx + 19, sy + 21, 2, 8)
 
 
 def draw_character(sx: int, sy: int, facing, frame: int):
@@ -466,7 +520,7 @@ def view_play(model: Model):
     cam_x = px - VIEWPORT_W // 2
     cam_y = py - VIEWPORT_H // 2
 
-    underwater = model.tilemap[py][px] == WATER
+    underwater = is_swimmable(model.tilemap[py][px])
 
     for sy in range(VIEWPORT_H):
         for sx in range(VIEWPORT_W):
@@ -477,7 +531,7 @@ def view_play(model: Model):
                 pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 0)
                 continue
             tile = model.tilemap[ty][tx]
-            if underwater and tile != WATER:
+            if underwater and not is_swimmable(tile):
                 pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 1)
             else:
                 draw_tile(sx * TILE_SIZE, sy * TILE_SIZE, tile, model.frame)
@@ -508,7 +562,7 @@ def view_play(model: Model):
         pyxel.text(bar_x + bar_w + 4, y, label, 7)
 
     # O2 bar (hidden when lungs on land and full)
-    underwater = model.tilemap[py][px] == WATER
+    underwater = is_swimmable(model.tilemap[py][px])
     can_auto_breathe = model.breathing_mode == LUNGS and not underwater
     show_o2 = not (can_auto_breathe and model.o2 >= O2_MAX)
     if show_o2:
@@ -551,6 +605,10 @@ def view_play(model: Model):
         DEAD_BUSH: "dead_bush",
         ROCK: "rock",
         WATER: "water",
+        WATER_DEEP: "deep_water",
+        BUSH_GREEN: "bush_green",
+        BUSH_FLOWERING: "bush_flower",
+        BUSH_BERRY: "bush_berry",
     }
     map_bottom = VIEWPORT_H * TILE_SIZE
     pyxel.rect(0, map_bottom, SCREEN_W, DEBUG_HEIGHT, 0)

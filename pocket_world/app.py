@@ -19,6 +19,7 @@ from .messages import (
     ToggleMinimap,
     DismissDeathScreen,
     RewindTick,
+    SetSprinting,
 )
 from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound
 from .mapgen import generate_map
@@ -129,6 +130,7 @@ class App:
                 msgs.append(Eat())
             if pyxel.btnp(pyxel.KEY_M):
                 msgs.append(ToggleMinimap())
+            msgs.append(SetSprinting(active=pyxel.btn(pyxel.KEY_C)))
 
         elif self.model.state == "dead":
             if pyxel.btnp(pyxel.KEY_RETURN):

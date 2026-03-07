@@ -44,6 +44,7 @@ class Model:
     seen_memories: tuple[str, ...]
     thought_cooldown: int
     show_minimap: bool  # whether minimap overlay is visible
+    sprinting: bool  # whether player is holding sprint key
 
 
 def init() -> tuple[Model, list[Cmd]]:
@@ -69,5 +70,6 @@ def init() -> tuple[Model, list[Cmd]]:
         seen_memories=(),
         thought_cooldown=0,
         show_minimap=False,
+        sprinting=False,
     )
     return model, []
