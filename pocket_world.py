@@ -50,6 +50,10 @@ O2_BREATHE_REFILL = 10 * 60  # 20 seconds refill per key press
 O2_AUTO_REFILL_RATE = 4  # frames of O2 restored per frame when auto-breathing
 O2_LUNGS_UNDERWATER_CHUNK = 3 * 60  # 3 seconds of O2 lost per gulp (every second)
 
+# Death screen / rewind
+DEATH_SCREEN_MIN_FRAMES = 60  # minimum frames before ENTER accepted
+REWIND_DURATION = 180  # 3 seconds at 60fps
+
 # Breathing modes
 LUNGS = "lungs"
 GILLS = "gills"
@@ -146,11 +150,16 @@ class Model:
     tilemap: tuple[tuple[int, ...], ...]
     seed: int
     move_timer: int  # counts down to 0 for continuous movement
-    state: str  # "title" | "play"
+    state: str  # "title" | "play" | "dead" | "rewind"
     seed_input: str  # text input on title screen
     frame: int  # animation frame counter
     o2: int  # O2 in frames remaining (max O2_MAX)
     breathing_mode: str  # LUNGS or GILLS
+    cycle: int  # current cycle number (starts at 1)
+    death_reason: str  # reason of death for death screen
+    learned: tuple[str, ...]  # skills learned this cycle
+    death_timer: int  # frames spent on death screen
+    rewind_timer: int  # frames remaining in rewind animation
 
 
 ##############
@@ -204,6 +213,21 @@ class ToggleBreathingMode(Msg):
     pass
 
 
+@dataclass(frozen=True)
+class Die(Msg):
+    reason: str
+
+
+@dataclass(frozen=True)
+class DismissDeathScreen(Msg):
+    pass
+
+
+@dataclass(frozen=True)
+class RewindTick(Msg):
+    pass
+
+
 ##############
 # Commands   #
 ##############
@@ -245,8 +269,20 @@ def init() -> tuple[Model, list[Cmd]]:
         frame=0,
         o2=O2_MAX,
         breathing_mode=GILLS,
+        cycle=1,
+        death_reason="",
+        learned=(),
+        death_timer=0,
+        rewind_timer=0,
     )
     return model, []
+
+
+def _add_learned(model: Model, skill: str) -> tuple[str, ...]:
+    """Add a skill to learned if not already present."""
+    if skill in model.learned:
+        return model.learned
+    return model.learned + (skill,)
 
 
 def _wrap(p: Point) -> Point:
@@ -268,7 +304,10 @@ def _find_spawn(tilemap: tuple[tuple[int, ...], ...]) -> Point:
 def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
     match msg:
         case Tick():
+            if model.state == "dead":
+                return replace(model, death_timer=model.death_timer + 1, frame=model.frame + 1), []
             new_o2 = model.o2
+            cmds: list[Cmd] = []
             if model.state == "play" and model.tilemap:
                 underwater = model.tilemap[model.player_pos.y][model.player_pos.x] == WATER
                 can_auto_breathe = (model.breathing_mode == LUNGS and not underwater)
@@ -280,12 +319,28 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     new_o2 = max(0, new_o2 - O2_LUNGS_UNDERWATER_CHUNK)
                 else:
                     new_o2 = max(0, new_o2 - 1)
+                # Check for death
+                if new_o2 <= 0:
+                    if model.breathing_mode == LUNGS and underwater:
+                        reason = "Drowned (lungs underwater)"
+                    elif model.breathing_mode == GILLS:
+                        reason = "Suffocated (gills ran dry)"
+                    else:
+                        reason = "Ran out of oxygen"
+                    return replace(
+                        model,
+                        frame=model.frame + 1,
+                        o2=0,
+                        state="dead",
+                        death_reason=reason,
+                        death_timer=0,
+                    ), []
             return replace(
                 model,
                 move_timer=max(0, model.move_timer - 1),
                 frame=model.frame + 1,
                 o2=new_o2,
-            ), []
+            ), cmds
 
         case MoveDir(direction=d):
             if model.state != "play":
@@ -297,10 +352,12 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             if is_walkable(model.tilemap[new_pos.y][new_pos.x]):
                 return replace(
                     model, player_pos=new_pos, facing=d, move_timer=MOVE_DELAY_LAND,
+                    learned=_add_learned(model, "walking on land"),
                 ), [PlayStepSound()]
             if is_swimmable(model.tilemap[new_pos.y][new_pos.x]):
                 return replace(
                     model, player_pos=new_pos, facing=d, move_timer=MOVE_DELAY_WATER,
+                    learned=_add_learned(model, "swimming"),
                 ), [PlaySwimSound()]
             return replace(model, facing=d, move_timer=0), []
 
@@ -317,6 +374,12 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 seed=s,
                 move_timer=0,
                 state="play",
+                o2=O2_MAX,
+                breathing_mode=GILLS,
+                learned=(),
+                death_reason="",
+                death_timer=0,
+                rewind_timer=0,
             ), []
 
         case TypeChar(char=c):
@@ -335,12 +398,44 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             underwater = model.tilemap[model.player_pos.y][model.player_pos.x] == WATER
             if model.breathing_mode == GILLS and underwater:
                 new_o2 = min(O2_MAX, model.o2 + O2_BREATHE_REFILL)
-                return replace(model, o2=new_o2), []
+                return replace(
+                    model, o2=new_o2,
+                    learned=_add_learned(model, "breathing underwater"),
+                ), []
             return model, []
 
         case ToggleBreathingMode():
             new_mode = GILLS if model.breathing_mode == LUNGS else LUNGS
-            return replace(model, breathing_mode=new_mode), []
+            skill = "switching to lungs" if new_mode == LUNGS else "switching to gills"
+            return replace(
+                model, breathing_mode=new_mode,
+                learned=_add_learned(model, skill),
+            ), []
+
+        case Die(reason=r):
+            return replace(
+                model, state="dead", death_reason=r, death_timer=0,
+            ), []
+
+        case DismissDeathScreen():
+            if model.state == "dead" and model.death_timer >= DEATH_SCREEN_MIN_FRAMES:
+                return replace(
+                    model, state="rewind", rewind_timer=REWIND_DURATION,
+                ), []
+            return model, []
+
+        case RewindTick():
+            if model.state == "rewind":
+                new_timer = model.rewind_timer - 1
+                if new_timer <= 0:
+                    # Respawn with same seed, next cycle
+                    return replace(
+                        model, state="play",
+                        cycle=model.cycle + 1,
+                        rewind_timer=0,
+                    ), [GenerateMap(seed=model.seed)]
+                return replace(model, rewind_timer=new_timer, frame=model.frame + 1), []
+            return model, []
 
     return model, []
 
@@ -392,6 +487,10 @@ def draw_character(sx: int, sy: int, facing: Point, frame: int):
 def view(model: Model):
     if model.state == "title":
         view_title(model)
+    elif model.state == "dead":
+        view_death(model)
+    elif model.state == "rewind":
+        view_rewind(model)
     else:
         view_play(model)
 
@@ -418,6 +517,86 @@ def view_title(model: Model):
 
     # Draw the character as preview
     draw_character(SCREEN_W // 2 - 16, 210, DOWN, model.frame)
+
+
+def _center_text(y: int, text: str, col: int):
+    """Draw text centered horizontally."""
+    x = (SCREEN_W - len(text) * pyxel.FONT_WIDTH) // 2
+    pyxel.text(x, y, text, col)
+
+
+def view_death(model: Model):
+    pyxel.cls(0)
+    y = 120
+
+    _center_text(y, f"Cycle {model.cycle} -- You died", 8)
+    y += 30
+
+    _center_text(y, f"Seed: {model.seed}", 13)
+    y += 20
+
+    _center_text(y, f"Reason: {model.death_reason}", 8)
+    y += 40
+
+    if model.learned:
+        _center_text(y, "In this cycle, you learned:", 7)
+        y += 16
+        for skill in model.learned:
+            _center_text(y, f"- {skill}", 11)
+            y += 12
+    else:
+        _center_text(y, "You didn't learn anything this cycle.", 13)
+    y += 30
+
+    if model.death_timer >= DEATH_SCREEN_MIN_FRAMES:
+        blink = (model.death_timer // 30) % 2 == 0
+        if blink:
+            _center_text(y, "[ENTER] Continue", 7)
+
+
+def _draw_hourglass(cx: int, cy: int, fill_frac: float):
+    """Draw a simple hourglass at center (cx, cy). fill_frac 0..1 = how full bottom is."""
+    # Outer frame
+    hw, hh = 20, 40
+    # Top triangle (emptying)
+    top_fill = 1.0 - fill_frac
+    # Bottom triangle (filling)
+    for i in range(hh):
+        # Width narrows toward middle
+        if i < hh // 2:
+            w = int(hw * (1 - i / (hh // 2)))
+            # Top half: sand only in upper portion
+            sand_h = int((hh // 2) * top_fill)
+            col = 9 if i < sand_h else 0
+        else:
+            j = i - hh // 2
+            w = int(hw * (j / (hh // 2)))
+            # Bottom half: sand fills from bottom
+            sand_h = int((hh // 2) * fill_frac)
+            rows_from_bottom = hh - 1 - i
+            col = 9 if rows_from_bottom < sand_h else 0
+        if w > 0:
+            pyxel.rect(cx - w, cy - hh // 2 + i, w * 2, 1, col)
+    # Frame lines
+    pyxel.line(cx - hw, cy - hh // 2, cx + hw, cy - hh // 2, 7)  # top
+    pyxel.line(cx - hw, cy + hh // 2, cx + hw, cy + hh // 2, 7)  # bottom
+    pyxel.line(cx - hw, cy - hh // 2, cx, cy, 7)  # top-left diagonal
+    pyxel.line(cx + hw, cy - hh // 2, cx, cy, 7)  # top-right diagonal
+    pyxel.line(cx - hw, cy + hh // 2, cx, cy, 7)  # bottom-left diagonal
+    pyxel.line(cx + hw, cy + hh // 2, cx, cy, 7)  # bottom-right diagonal
+
+
+def view_rewind(model: Model):
+    pyxel.cls(0)
+    # fill_frac goes from 0 to 1 as rewind_timer counts down
+    fill_frac = 1.0 - (model.rewind_timer / REWIND_DURATION)
+
+    _draw_hourglass(SCREEN_W // 2, SCREEN_H // 2 - 20, fill_frac)
+
+    _center_text(SCREEN_H // 2 + 50, "Rewinding...", 7)
+
+    # Cycle number
+    _center_text(SCREEN_H // 2 + 70, f"Cycle {model.cycle + 1}", 13)
 
 
 def view_play(model: Model):
@@ -542,6 +721,13 @@ class App:
                 msgs.append(Breathe())
             if pyxel.btnp(pyxel.KEY_B):
                 msgs.append(ToggleBreathingMode())
+
+        elif self.model.state == "dead":
+            if pyxel.btnp(pyxel.KEY_RETURN):
+                msgs.append(DismissDeathScreen())
+
+        elif self.model.state == "rewind":
+            msgs.append(RewindTick())
 
         msgs.append(Tick())
         return msgs
