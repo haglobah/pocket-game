@@ -15,6 +15,9 @@ from .model import Model, ThoughtBubble
 _TITLE_FONT = None
 _UI_FONT = None
 _HUD_FONT = None
+_THOUGHT_FONT = None
+
+_THOUGHT_FONT_SIZE = 16
 
 
 def _load_ui_font(filename: str, size: float):
@@ -48,6 +51,13 @@ def _get_hud_font():
     if _HUD_FONT is None:
         _HUD_FONT = _load_ui_font("PixelMplus12-Regular.ttf", 16)
     return _HUD_FONT
+
+
+def _get_thought_font():
+    global _THOUGHT_FONT
+    if _THOUGHT_FONT is None:
+        _THOUGHT_FONT = _load_ui_font("PixelMplus12-Regular.ttf", _THOUGHT_FONT_SIZE)
+    return _THOUGHT_FONT
 
 
 def draw_tile(sx: int, sy: int, tile: int, frame: int):
@@ -204,6 +214,27 @@ def _wrap_text(text: str, max_chars: int) -> list[str]:
     return lines
 
 
+def _measure_text_width(text: str, font=None) -> int:
+    return font.text_width(text) if font else len(text) * pyxel.FONT_WIDTH
+
+
+def _wrap_text_by_width(text: str, max_width: int, font=None) -> list[str]:
+    """Word-wrap text into lines that fit within max_width pixels."""
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}" if current else word
+        if current and _measure_text_width(candidate, font) > max_width:
+            lines.append(current)
+            current = word
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    return lines
+
+
 def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
     """Draw a thought bubble centered at cx with tail ending at bottom_y."""
     chars_shown = min(len(thought.text), thought.timer // THOUGHT_CHAR_SPEED)
@@ -211,12 +242,13 @@ def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
     if not display_text:
         return
 
-    lines = _wrap_text(display_text, 28)
-    fw = pyxel.FONT_WIDTH
-    fh = pyxel.FONT_HEIGHT
-    line_h = fh + 2
+    thought_font = _get_thought_font()
+    max_text_w = 240
+    lines = _wrap_text_by_width(display_text, max_text_w, thought_font)
+    fh = _THOUGHT_FONT_SIZE if thought_font else pyxel.FONT_HEIGHT
+    line_h = fh + 4
 
-    text_w = max(len(line) for line in lines) * fw
+    text_w = max(_measure_text_width(line, thought_font) for line in lines)
     text_h = len(lines) * line_h - 2
 
     pad_x, pad_y = 8, 6
@@ -253,7 +285,7 @@ def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
     ty = by + pad_y
     for line in lines:
         lx = bx + pad_x
-        pyxel.text(lx, ty, line, 1)
+        pyxel.text(lx, ty, line, 1, thought_font)
         ty += line_h
 
 
