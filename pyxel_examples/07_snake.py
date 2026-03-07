@@ -5,11 +5,12 @@
 # license: MIT
 # version: 1.0
 
-from collections import deque, namedtuple
+from dataclasses import dataclass
+from collections import namedtuple
 
 import pyxel
 
-Point = namedtuple("Point", ["x", "y"])  # Convenience class for coordinates
+Point = namedtuple("Point", ["x", "y"])
 
 
 #############
@@ -41,170 +42,318 @@ LEFT = Point(-1, 0)
 START = Point(5, 5 + HEIGHT_SCORE)
 
 
-###################
-# The game itself #
-###################
+###########
+# Model   #
+###########
 
 
-class Snake:
-    """The class that sets up and runs the game."""
+@dataclass(frozen=True)
+class Model:
+    direction: Point
+    snake: tuple[Point, ...]
+    apple: Point
+    score: int
+    death: bool
+    popped_point: Point | None
 
+
+##############
+# Messages   #
+##############
+
+
+@dataclass(frozen=True)
+class Msg:
+    pass
+
+
+@dataclass(frozen=True)
+class Tick(Msg):
+    pass
+
+
+@dataclass(frozen=True)
+class ChangeDir(Msg):
+    direction: Point
+
+
+@dataclass(frozen=True)
+class Restart(Msg):
+    pass
+
+
+@dataclass(frozen=True)
+class Quit(Msg):
+    pass
+
+
+@dataclass(frozen=True)
+class AppleGenerated(Msg):
+    position: Point
+
+
+##############
+# Commands   #
+##############
+
+
+@dataclass(frozen=True)
+class Cmd:
+    pass
+
+
+@dataclass(frozen=True)
+class PlayBgm(Cmd):
+    pass
+
+
+@dataclass(frozen=True)
+class PlayEatSound(Cmd):
+    pass
+
+
+@dataclass(frozen=True)
+class PlayDeathSound(Cmd):
+    pass
+
+
+@dataclass(frozen=True)
+class QuitApp(Cmd):
+    pass
+
+
+@dataclass(frozen=True)
+class GenerateApple(Cmd):
+    snake: tuple[Point, ...]
+
+
+################
+# Init/Update  #
+################
+
+OPPOSITE = {UP: DOWN, DOWN: UP, LEFT: RIGHT, RIGHT: LEFT}
+
+
+def init() -> tuple[Model, list[Cmd]]:
+    model = Model(
+        direction=RIGHT,
+        snake=(START,),
+        apple=START,
+        score=0,
+        death=False,
+        popped_point=None,
+    )
+    return model, [PlayBgm(), GenerateApple(snake=model.snake)]
+
+
+def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
+    match msg:
+        case ChangeDir(direction=new_dir):
+            if model.death:
+                return model, []
+            if new_dir == OPPOSITE.get(model.direction):
+                return model, []
+            return Model(
+                direction=new_dir,
+                snake=model.snake,
+                apple=model.apple,
+                score=model.score,
+                death=model.death,
+                popped_point=model.popped_point,
+            ), []
+
+        case Tick():
+            if model.death:
+                return model, []
+            old_head = model.snake[0]
+            new_head = Point(
+                old_head.x + model.direction.x, old_head.y + model.direction.y
+            )
+            new_snake = (new_head,) + model.snake
+            popped = new_snake[-1]
+            new_snake = new_snake[:-1]
+
+            # Check death: out of bounds or self-collision
+            dead = (
+                new_head.x < 0
+                or new_head.y < HEIGHT_SCORE
+                or new_head.x >= WIDTH
+                or new_head.y >= HEIGHT
+                or new_head in new_snake[1:]
+            )
+            if dead:
+                return (
+                    Model(
+                        direction=model.direction,
+                        snake=new_snake,
+                        apple=model.apple,
+                        score=model.score,
+                        death=True,
+                        popped_point=popped,
+                    ),
+                    [PlayDeathSound()],
+                )
+
+            # Check apple
+            if new_head == model.apple:
+                grown_snake = new_snake + (popped,)
+                return (
+                    Model(
+                        direction=model.direction,
+                        snake=grown_snake,
+                        apple=model.apple,
+                        score=model.score + 1,
+                        death=False,
+                        popped_point=None,
+                    ),
+                    [PlayEatSound(), GenerateApple(snake=grown_snake)],
+                )
+
+            return (
+                Model(
+                    direction=model.direction,
+                    snake=new_snake,
+                    apple=model.apple,
+                    score=model.score,
+                    death=False,
+                    popped_point=popped,
+                ),
+                [],
+            )
+
+        case AppleGenerated(position=pos):
+            return (
+                Model(
+                    direction=model.direction,
+                    snake=model.snake,
+                    apple=pos,
+                    score=model.score,
+                    death=model.death,
+                    popped_point=model.popped_point,
+                ),
+                [],
+            )
+
+        case Restart():
+            return init()
+
+        case Quit():
+            return model, [QuitApp()]
+
+    return model, []
+
+
+#######################
+# Command interpreter #
+#######################
+
+
+def interpret_cmd(cmd: Cmd) -> list[Msg]:
+    match cmd:
+        case PlayBgm():
+            pyxel.playm(0, loop=True)
+        case PlayEatSound():
+            pyxel.play(0, 0)
+        case PlayDeathSound():
+            pyxel.stop()
+            pyxel.play(0, 1)
+        case QuitApp():
+            pyxel.quit()
+        case GenerateApple(snake=snake):
+            snake_pixels = set(snake)
+            pos = snake[0]
+            while pos in snake_pixels:
+                x = pyxel.rndi(0, WIDTH - 1)
+                y = pyxel.rndi(HEIGHT_SCORE + 1, HEIGHT - 1)
+                pos = Point(x, y)
+            return [AppleGenerated(position=pos)]
+    return []
+
+
+########
+# View #
+########
+
+
+def center_text(text, page_width, char_width=pyxel.FONT_WIDTH):
+    text_width = len(text) * char_width
+    return (page_width - text_width) // 2
+
+
+def view(model: Model):
+    if not model.death:
+        pyxel.cls(col=COL_BACKGROUND)
+        # Draw snake
+        for i, point in enumerate(model.snake):
+            colour = COL_HEAD if i == 0 else COL_BODY
+            pyxel.pset(point.x, point.y, col=colour)
+        # Draw score
+        score = f"{model.score:04}"
+        pyxel.rect(0, 0, WIDTH, HEIGHT_SCORE, COL_SCORE_BACKGROUND)
+        pyxel.text(1, 1, score, COL_SCORE)
+        # Draw apple
+        pyxel.pset(model.apple.x, model.apple.y, col=COL_APPLE)
+    else:
+        pyxel.cls(col=COL_DEATH)
+        display_text = TEXT_DEATH[:]
+        display_text.insert(1, f"{model.score:04}")
+        for i, text in enumerate(display_text):
+            y_offset = (pyxel.FONT_HEIGHT + 2) * i
+            text_x = center_text(text, WIDTH)
+            pyxel.text(text_x, HEIGHT_DEATH + y_offset, text, COL_TEXT_DEATH)
+
+
+###############
+# App (shell) #
+###############
+
+
+class App:
     def __init__(self):
-        """Initiate pyxel, set up initial game variables, and run."""
-
         pyxel.init(
             WIDTH, HEIGHT, title="Snake!", fps=20, display_scale=12, capture_scale=6
         )
         define_sound_and_music()
-        self.reset()
-        pyxel.run(self.update, self.draw)
+        self.model, cmds = init()
+        self._process_cmds(cmds)
+        pyxel.run(self._update, self._draw)
 
-    def reset(self):
-        """Initiate key variables (direction, snake, apple, score, etc.)"""
-
-        self.direction = RIGHT
-        self.snake = deque()
-        self.snake.append(START)
-        self.death = False
-        self.score = 0
-        self.generate_apple()
-
-        pyxel.playm(0, loop=True)
-
-    ##############
-    # Game logic #
-    ##############
-
-    def update(self):
-        """Update logic of game.
-        Updates the snake and checks for scoring/win condition."""
-
-        if not self.death:
-            self.update_direction()
-            self.update_snake()
-            self.check_death()
-            self.check_apple()
+    def _collect_input(self) -> list[Msg]:
+        msgs: list[Msg] = []
 
         if pyxel.btn(pyxel.KEY_Q):
-            pyxel.quit()
+            msgs.append(Quit())
 
         if pyxel.btnp(pyxel.KEY_R) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_A):
-            self.reset()
-
-    def update_direction(self):
-        """Watch the keys and change direction."""
+            msgs.append(Restart())
 
         if pyxel.btn(pyxel.KEY_UP) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_UP):
-            if self.direction is not DOWN:
-                self.direction = UP
-
+            msgs.append(ChangeDir(direction=UP))
         elif pyxel.btn(pyxel.KEY_DOWN) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_DOWN):
-            if self.direction is not UP:
-                self.direction = DOWN
-
+            msgs.append(ChangeDir(direction=DOWN))
         elif pyxel.btn(pyxel.KEY_LEFT) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_LEFT):
-            if self.direction is not RIGHT:
-                self.direction = LEFT
-
+            msgs.append(ChangeDir(direction=LEFT))
         elif pyxel.btn(pyxel.KEY_RIGHT) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_RIGHT):
-            if self.direction is not LEFT:
-                self.direction = RIGHT
+            msgs.append(ChangeDir(direction=RIGHT))
 
-    def update_snake(self):
-        """Move the snake based on the direction."""
+        msgs.append(Tick())
+        return msgs
 
-        old_head = self.snake[0]
-        new_head = Point(old_head.x + self.direction.x, old_head.y + self.direction.y)
-        self.snake.appendleft(new_head)
-        self.popped_point = self.snake.pop()
+    def _update(self):
+        msgs = self._collect_input()
+        for msg in msgs:
+            self.model, cmds = update(self.model, msg)
+            self._process_cmds(cmds)
 
-    def check_apple(self):
-        """Check whether the snake is on an apple."""
+    def _process_cmds(self, cmds: list[Cmd]):
+        for cmd in cmds:
+            new_msgs = interpret_cmd(cmd)
+            for msg in new_msgs:
+                self.model, new_cmds = update(self.model, msg)
+                self._process_cmds(new_cmds)
 
-        if self.snake[0] == self.apple:
-            self.score += 1
-            self.snake.append(self.popped_point)
-            self.generate_apple()
-            pyxel.play(0, 0)
-
-    def generate_apple(self):
-        """Generate an apple randomly."""
-
-        snake_pixels = set(self.snake)
-
-        self.apple = self.snake[0]
-        while self.apple in snake_pixels:
-            x = pyxel.rndi(0, WIDTH - 1)
-            y = pyxel.rndi(HEIGHT_SCORE + 1, HEIGHT - 1)
-            self.apple = Point(x, y)
-
-    def check_death(self):
-        """Check whether the snake has died (out of bounds or doubled up.)"""
-
-        head = self.snake[0]
-        if head.x < 0 or head.y < HEIGHT_SCORE or head.x >= WIDTH or head.y >= HEIGHT:
-            self.death_event()
-        elif len(self.snake) != len(set(self.snake)):
-            self.death_event()
-
-    def death_event(self):
-        """Kill the game (bring up end screen)."""
-
-        self.death = True  # Check having run into self
-        pyxel.stop()
-        pyxel.play(0, 1)
-
-    ##############
-    # Draw logic #
-    ##############
-
-    def draw(self):
-        """Draw the background, snake, score, and apple OR the end screen."""
-
-        if not self.death:
-            pyxel.cls(col=COL_BACKGROUND)
-            self.draw_snake()
-            self.draw_score()
-            pyxel.pset(self.apple.x, self.apple.y, col=COL_APPLE)
-        else:
-            self.draw_death()
-
-    def draw_snake(self):
-        """Draw the snake with a distinct head by iterating through deque."""
-
-        for i, point in enumerate(self.snake):
-            if i == 0:
-                colour = COL_HEAD
-            else:
-                colour = COL_BODY
-            pyxel.pset(point.x, point.y, col=colour)
-
-    def draw_score(self):
-        """Draw the score at the top."""
-
-        score = f"{self.score:04}"
-        pyxel.rect(0, 0, WIDTH, HEIGHT_SCORE, COL_SCORE_BACKGROUND)
-        pyxel.text(1, 1, score, COL_SCORE)
-
-    def draw_death(self):
-        """Draw a blank screen with some text."""
-
-        pyxel.cls(col=COL_DEATH)
-
-        display_text = TEXT_DEATH[:]
-        display_text.insert(1, f"{self.score:04}")
-
-        for i, text in enumerate(display_text):
-            y_offset = (pyxel.FONT_HEIGHT + 2) * i
-            text_x = self.center_text(text, WIDTH)
-            pyxel.text(text_x, HEIGHT_DEATH + y_offset, text, COL_TEXT_DEATH)
-
-    @staticmethod
-    def center_text(text, page_width, char_width=pyxel.FONT_WIDTH):
-        """Helper function for calculating the start x value for centered text."""
-
-        text_width = len(text) * char_width
-        return (page_width - text_width) // 2
+    def _draw(self):
+        view(self.model)
 
 
 ###########################
@@ -262,11 +411,17 @@ def define_sound_and_music():
         + "f1 f1 f1 f1 f1 f1 f1 f1 g1 g1 g1 g1 g1 g1 g1 g1"
     )
     harmony2 = (
-        ("f1" * 8 + "g1" * 8 + "a1" * 8 + ("c2" * 7 + "d2")) * 3 + "f1" * 16 + "g1" * 16
+        ("f1" * 8 + "g1" * 8 + "a1" * 8 + ("c2" * 7 + "d2")) * 3
+        + "f1" * 16
+        + "g1" * 16
     )
 
     pyxel.sounds[3].set(
-        notes=harmony1 * 2 + harmony2 * 2, tones="t", volumes="5", effects="f", speed=20
+        notes=harmony1 * 2 + harmony2 * 2,
+        tones="t",
+        volumes="5",
+        effects="f",
+        speed=20,
     )
     pyxel.sounds[4].set(
         notes=("f0 r a4 r  f0 f0 a4 r  f0 r a4 r  f0 f0 a4 f0"),
@@ -279,4 +434,4 @@ def define_sound_and_music():
     pyxel.musics[0].set([], [2], [3], [4])
 
 
-Snake()
+App()
