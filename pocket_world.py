@@ -33,19 +33,6 @@ TREE = 6
 ROCK = 7
 BUSH = 8
 
-# Tile colors (pyxel palette indices)
-TILE_COL = {
-    GRASS: 3,
-    TALL_GRASS: 11,
-    FLOWERS: 3,
-    DIRT: 4,
-    WATER: 12,
-    SAND: 15,
-    TREE: 3,
-    ROCK: 13,
-    BUSH: 3,
-}
-
 # Movement speed (frames between steps)
 MOVE_DELAY = 4
 
@@ -54,13 +41,6 @@ UP = Point(0, -1)
 DOWN = Point(0, 1)
 LEFT = Point(-1, 0)
 RIGHT = Point(1, 0)
-
-# Character sprite colors
-COL_BODY = 10       # yellow
-COL_EYE = 0         # black
-COL_FEET = 4        # brown
-COL_BELLY = 9       # orange
-
 
 ###########
 # Map Gen #
@@ -376,294 +356,25 @@ def interpret_cmd(cmd: Cmd) -> list[Msg]:
 
 
 def draw_tile(sx: int, sy: int, tile: int, frame: int):
-    """Draw a tile at screen pixel position (sx, sy) — 32x32."""
-    col = TILE_COL[tile]
-    pyxel.rect(sx, sy, TILE_SIZE, TILE_SIZE, col)
-
-    match tile:
-        case t if t == GRASS:
-            # Subtle grass texture — scattered tufts and shade variation
-            for pos in [(5, 7), (19, 4), (12, 17), (26, 23), (3, 25),
-                        (22, 11), (8, 28), (28, 7), (15, 10), (6, 19)]:
-                pyxel.pset(sx + pos[0], sy + pos[1], 11)
-            # Tiny grass blade clusters
-            for bx, by in [(9, 13), (23, 19), (4, 22)]:
-                pyxel.line(sx + bx, sy + by + 3, sx + bx, sy + by, 11)
-                pyxel.line(sx + bx + 1, sy + by + 2, sx + bx + 1, sy + by, 3)
-        case t if t == TALL_GRASS:
-            # Dense grass blades with varied heights and thickness
-            for i in range(8):
-                bx = sx + 2 + i * 4
-                h = 12 + (i % 4) * 2
-                by = sy + 30 - h
-                pyxel.line(bx, sy + 30, bx, by, 3)
-                pyxel.line(bx + 1, sy + 30, bx + 1, by - 1, 3)
-                pyxel.line(bx + 2, sy + 30, bx + 2, by + 2, 3)
-                # Lighter tips
-                pyxel.rect(bx, by - 1, 2, 2, 11)
-                # Seed heads on alternating blades
-                if i % 2 == 0:
-                    pyxel.rect(bx - 1, by - 3, 3, 2, 15)
-                    pyxel.pset(bx, by - 4, 15)
-        case t if t == FLOWERS:
-            # Detailed flowers with petals, stems, and leaves
-            # Red flower (5 petals)
-            pyxel.line(sx + 7, sy + 12, sx + 7, sy + 24, 3)  # stem
-            pyxel.rect(sx + 4, sy + 17, 3, 2, 11)  # leaf
-            for dx, dy in [(-3, 0), (3, 0), (0, -3), (0, 3), (-2, -2)]:
-                pyxel.rect(sx + 6 + dx, sy + 10 + dy, 3, 3, 8)
-            pyxel.rect(sx + 6, sy + 10, 3, 3, 10)  # center
-
-            # Yellow daisy
-            pyxel.line(sx + 21, sy + 14, sx + 21, sy + 26, 3)  # stem
-            pyxel.rect(sx + 22, sy + 20, 3, 2, 11)  # leaf
-            for dx, dy in [(-3, 0), (3, 0), (0, -3), (0, 3)]:
-                pyxel.rect(sx + 20 + dx, sy + 10 + dy, 3, 3, 10)
-            pyxel.rect(sx + 20, sy + 10, 3, 3, 9)  # center
-
-            # Small purple flower
-            pyxel.line(sx + 14, sy + 20, sx + 14, sy + 28, 3)
-            pyxel.rect(sx + 13, sy + 17, 3, 3, 14)
-            pyxel.pset(sx + 14, sy + 18, 7)
-
-            # Tiny white wildflowers
-            for px_, py_ in [(26, 24), (3, 27), (10, 28)]:
-                pyxel.rect(sx + px_, sy + py_, 2, 2, 7)
-        case t if t == WATER:
-            # Animated water with depth and ripples
-            # Depth variation — darker patches
-            pyxel.rect(sx + 3, sy + 3, 8, 4, 1)
-            pyxel.rect(sx + 18, sy + 14, 8, 4, 1)
-            pyxel.rect(sx + 8, sy + 20, 6, 3, 1)
-            # Medium depth
-            pyxel.rect(sx + 12, sy + 6, 6, 3, 5)
-            pyxel.rect(sx + 2, sy + 16, 5, 3, 5)
-            # Animated ripple highlights
-            offset = (frame // 10) % 32
-            for ry, rlen in [(6, 5), (13, 4), (20, 6), (27, 3)]:
-                rx = ((offset + ry * 3) % 26) + 3
-                pyxel.rect(sx + rx, sy + ry, rlen, 1, 6)
-            # Sparkle
-            sparkle_x = (frame // 8 + 7) % 28 + 2
-            sparkle_y = (frame // 12 + 13) % 28 + 2
-            pyxel.pset(sx + sparkle_x, sy + sparkle_y, 7)
-        case t if t == SAND:
-            # Sandy texture with shells, pebbles, and ripple marks
-            # Sand ripple lines
-            for ry in [8, 16, 24]:
-                pyxel.line(sx + 2, sy + ry, sx + 29, sy + ry, 10)
-            # Pebbles
-            for px_, py_ in [(7, 5), (22, 18), (5, 22), (18, 4), (27, 27)]:
-                pyxel.rect(sx + px_, sy + py_, 2, 2, 10)
-            # Shell
-            pyxel.rect(sx + 12, sy + 13, 4, 3, 7)
-            pyxel.rect(sx + 13, sy + 12, 2, 1, 7)
-            pyxel.pset(sx + 13, sy + 14, 6)
-            pyxel.line(sx + 12, sy + 15, sx + 15, sy + 15, 10)
-            # Darker sand patches
-            pyxel.rect(sx + 3, sy + 10, 3, 2, 10)
-            pyxel.rect(sx + 24, sy + 8, 3, 2, 10)
-        case t if t == TREE:
-            # Detailed tree with roots, textured trunk, layered canopy
-            # Ground shadow
-            pyxel.rect(sx + 6, sy + 28, 20, 3, 11)
-            pyxel.rect(sx + 10, sy + 27, 12, 1, 11)
-            # Roots
-            pyxel.line(sx + 10, sy + 28, sx + 7, sy + 30, 4)
-            pyxel.line(sx + 22, sy + 28, sx + 25, sy + 30, 4)
-            pyxel.line(sx + 14, sy + 29, sx + 13, sy + 31, 4)
-            # Trunk
-            pyxel.rect(sx + 12, sy + 17, 8, 12, 4)
-            # Bark texture
-            pyxel.rect(sx + 14, sy + 18, 3, 10, 2)
-            pyxel.pset(sx + 13, sy + 20, 2)
-            pyxel.pset(sx + 18, sy + 22, 2)
-            pyxel.line(sx + 13, sy + 24, sx + 15, sy + 26, 2)
-            # Canopy — back layer (dark green)
-            pyxel.circ(sx + 16, sy + 10, 14, 11)
-            # Canopy — mid layer (medium green)
-            pyxel.circ(sx + 12, sy + 8, 8, 3)
-            pyxel.circ(sx + 21, sy + 9, 7, 3)
-            pyxel.circ(sx + 16, sy + 12, 7, 3)
-            # Canopy — highlights
-            pyxel.circ(sx + 14, sy + 6, 5, 11)
-            pyxel.circ(sx + 20, sy + 7, 4, 11)
-            pyxel.circ(sx + 16, sy + 4, 3, 3)
-            # Light spots
-            pyxel.rect(sx + 10, sy + 5, 2, 2, 11)
-            pyxel.rect(sx + 22, sy + 4, 2, 2, 11)
-            pyxel.pset(sx + 16, sy + 2, 3)
-        case t if t == ROCK:
-            # Large boulder with shading, cracks, and moss
-            # Ground shadow
-            pyxel.rect(sx + 3, sy + 26, 26, 3, 1)
-            # Main body
-            pyxel.rect(sx + 4, sy + 8, 24, 18, 13)
-            pyxel.rect(sx + 6, sy + 5, 20, 3, 13)
-            pyxel.rect(sx + 9, sy + 3, 14, 2, 13)
-            # Highlight (top-left face)
-            pyxel.rect(sx + 7, sy + 6, 8, 4, 5)
-            pyxel.rect(sx + 9, sy + 4, 6, 2, 5)
-            pyxel.rect(sx + 8, sy + 10, 4, 3, 5)
-            # Shadow (bottom-right)
-            pyxel.rect(sx + 18, sy + 20, 8, 5, 1)
-            pyxel.rect(sx + 24, sy + 14, 3, 6, 1)
-            pyxel.rect(sx + 22, sy + 18, 2, 4, 1)
-            # Crack lines
-            pyxel.line(sx + 14, sy + 8, sx + 16, sy + 14, 1)
-            pyxel.line(sx + 16, sy + 14, sx + 18, sy + 16, 1)
-            pyxel.line(sx + 16, sy + 14, sx + 14, sy + 18, 1)
-            # Moss patches
-            pyxel.rect(sx + 5, sy + 20, 3, 2, 3)
-            pyxel.rect(sx + 10, sy + 23, 4, 2, 3)
-            pyxel.pset(sx + 7, sy + 22, 11)
-        case t if t == BUSH:
-            # Detailed bush with layered foliage and berries
-            # Ground shadow
-            pyxel.rect(sx + 6, sy + 27, 20, 3, 11)
-            pyxel.rect(sx + 10, sy + 26, 12, 1, 11)
-            # Stem/base
-            pyxel.rect(sx + 14, sy + 24, 4, 4, 4)
-            # Main foliage — back layer
-            pyxel.circ(sx + 16, sy + 16, 12, 11)
-            # Mid layer clusters
-            pyxel.circ(sx + 10, sy + 14, 7, 3)
-            pyxel.circ(sx + 22, sy + 16, 7, 3)
-            pyxel.circ(sx + 16, sy + 12, 6, 3)
-            # Highlight clusters
-            pyxel.circ(sx + 12, sy + 11, 4, 11)
-            pyxel.circ(sx + 20, sy + 13, 4, 11)
-            pyxel.circ(sx + 16, sy + 10, 3, 3)
-            # Leaf detail
-            pyxel.rect(sx + 6, sy + 10, 2, 2, 11)
-            pyxel.rect(sx + 24, sy + 12, 2, 2, 11)
-            # Berries
-            pyxel.rect(sx + 11, sy + 18, 3, 3, 8)
-            pyxel.pset(sx + 12, sy + 18, 14)
-            pyxel.rect(sx + 19, sy + 14, 3, 3, 8)
-            pyxel.pset(sx + 20, sy + 14, 14)
-            pyxel.rect(sx + 14, sy + 20, 2, 2, 8)
-            pyxel.rect(sx + 23, sy + 20, 2, 2, 8)
-        case t if t == DIRT:
-            # Dirt with texture, pebbles, and cracks
-            # Color variation patches
-            pyxel.rect(sx + 5, sy + 8, 5, 4, 2)
-            pyxel.rect(sx + 18, sy + 4, 6, 3, 2)
-            pyxel.rect(sx + 10, sy + 22, 5, 3, 2)
-            pyxel.rect(sx + 24, sy + 18, 4, 4, 2)
-            # Pebbles
-            pyxel.rect(sx + 13, sy + 12, 3, 2, 5)
-            pyxel.rect(sx + 22, sy + 10, 2, 2, 5)
-            pyxel.rect(sx + 6, sy + 26, 3, 2, 5)
-            pyxel.rect(sx + 26, sy + 25, 2, 2, 5)
-            # Scattered dots
-            for px_, py_ in [(3, 14), (8, 5), (20, 27), (28, 8), (15, 28), (2, 20)]:
-                pyxel.pset(sx + px_, sy + py_, 2)
-            # Small crack
-            pyxel.line(sx + 16, sy + 16, sx + 20, sy + 19, 2)
-            pyxel.pset(sx + 20, sy + 20, 2)
+    """Draw a tile at screen pixel position (sx, sy) — 32x32, using sprites."""
+    if tile == WATER:
+        water_frame = (frame // 80) % 4
+        if water_frame == 0:
+            pyxel.blt(sx, sy, 0, 128, 0, 32, 32)
+        else:
+            pyxel.blt(sx, sy, 0, 32 * water_frame, 32, 32, 32)
+    elif tile <= 7:
+        pyxel.blt(sx, sy, 0, tile * 32, 0, 32, 32)
+    else:  # BUSH (8)
+        pyxel.blt(sx, sy, 0, 0, 32, 32, 32)
 
 
 def draw_character(sx: int, sy: int, facing: Point, frame: int):
-    """Draw a creature sprite at screen pixel position (32x32)."""
+    """Draw a creature sprite at screen pixel position (32x32), using sprites."""
     walk_bob = (frame // 6) % 2
-
-    # Shadow on ground
-    pyxel.rect(sx + 8, sy + 29, 16, 3, 1)
-    pyxel.rect(sx + 12, sy + 28, 8, 1, 1)
-
-    # Body (rounded shape)
-    pyxel.rect(sx + 6, sy + 4, 20, 20, COL_BODY)
-    pyxel.rect(sx + 8, sy + 2, 16, 24, COL_BODY)
-    pyxel.rect(sx + 10, sy + 1, 12, 26, COL_BODY)
-
-    # Belly patch (rounded)
-    pyxel.rect(sx + 10, sy + 12, 12, 8, COL_BELLY)
-    pyxel.rect(sx + 12, sy + 10, 8, 12, COL_BELLY)
-    pyxel.rect(sx + 11, sy + 11, 10, 10, COL_BELLY)
-
-    # Ears
-    pyxel.rect(sx + 7, sy, 4, 4, COL_BODY)
-    pyxel.rect(sx + 21, sy, 4, 4, COL_BODY)
-    # Inner ear
-    pyxel.rect(sx + 8, sy + 1, 2, 2, COL_BELLY)
-    pyxel.rect(sx + 22, sy + 1, 2, 2, COL_BELLY)
-
-    # Eyes and face based on facing direction
-    match facing:
-        case Point(0, -1):  # up — show back
-            # Back markings
-            pyxel.rect(sx + 9, sy + 5, 4, 3, COL_BELLY)
-            pyxel.rect(sx + 19, sy + 5, 4, 3, COL_BELLY)
-            # Tail
-            pyxel.rect(sx + 14, sy + 25, 4, 4, COL_BELLY)
-            pyxel.rect(sx + 15, sy + 27, 2, 3, COL_BELLY)
-        case Point(0, 1):  # down — face visible
-            # Eyes (white sclera + pupil + highlight)
-            pyxel.rect(sx + 8, sy + 6, 6, 6, 7)
-            pyxel.rect(sx + 18, sy + 6, 6, 6, 7)
-            # Pupils
-            pyxel.rect(sx + 10, sy + 8, 4, 4, COL_EYE)
-            pyxel.rect(sx + 20, sy + 8, 4, 4, COL_EYE)
-            # Eye highlights
-            pyxel.rect(sx + 11, sy + 8, 2, 2, 7)
-            pyxel.rect(sx + 21, sy + 8, 2, 2, 7)
-            # Nose
-            pyxel.rect(sx + 14, sy + 14, 4, 2, 4)
-            # Mouth
-            pyxel.line(sx + 13, sy + 18, sx + 16, sy + 19, COL_EYE)
-            pyxel.line(sx + 16, sy + 19, sx + 19, sy + 18, COL_EYE)
-            # Cheeks (blush)
-            pyxel.rect(sx + 6, sy + 13, 3, 2, 8)
-            pyxel.rect(sx + 23, sy + 13, 3, 2, 8)
-        case Point(-1, 0):  # left
-            # Eye on left side
-            pyxel.rect(sx + 6, sy + 6, 6, 6, 7)
-            pyxel.rect(sx + 6, sy + 8, 4, 4, COL_EYE)
-            pyxel.rect(sx + 7, sy + 8, 2, 2, 7)
-            # Nose
-            pyxel.rect(sx + 4, sy + 13, 3, 2, 4)
-            # Mouth
-            pyxel.line(sx + 5, sy + 17, sx + 8, sy + 18, COL_EYE)
-            # Cheek
-            pyxel.rect(sx + 6, sy + 14, 2, 2, 8)
-            # Tail
-            pyxel.rect(sx + 24, sy + 16, 4, 4, COL_BELLY)
-            pyxel.rect(sx + 26, sy + 14, 3, 3, COL_BELLY)
-        case Point(1, 0):  # right
-            # Eye on right side
-            pyxel.rect(sx + 20, sy + 6, 6, 6, 7)
-            pyxel.rect(sx + 22, sy + 8, 4, 4, COL_EYE)
-            pyxel.rect(sx + 23, sy + 8, 2, 2, 7)
-            # Nose
-            pyxel.rect(sx + 25, sy + 13, 3, 2, 4)
-            # Mouth
-            pyxel.line(sx + 24, sy + 17, sx + 27, sy + 18, COL_EYE)
-            # Cheek
-            pyxel.rect(sx + 24, sy + 14, 2, 2, 8)
-            # Tail
-            pyxel.rect(sx + 4, sy + 16, 4, 4, COL_BELLY)
-            pyxel.rect(sx + 3, sy + 14, 3, 3, COL_BELLY)
-
-    # Arms with swing animation
-    if walk_bob:
-        pyxel.rect(sx + 4, sy + 12, 3, 6, COL_BODY)
-        pyxel.rect(sx + 25, sy + 10, 3, 6, COL_BODY)
-        pyxel.rect(sx + 4, sy + 17, 2, 2, COL_BODY)
-        pyxel.rect(sx + 26, sy + 15, 2, 2, COL_BODY)
-    else:
-        pyxel.rect(sx + 4, sy + 10, 3, 6, COL_BODY)
-        pyxel.rect(sx + 25, sy + 12, 3, 6, COL_BODY)
-        pyxel.rect(sx + 4, sy + 15, 2, 2, COL_BODY)
-        pyxel.rect(sx + 26, sy + 17, 2, 2, COL_BODY)
-
-    # Feet with walk animation
-    if walk_bob:
-        pyxel.rect(sx + 8, sy + 26, 5, 4, COL_FEET)
-        pyxel.rect(sx + 19, sy + 24, 5, 4, COL_FEET)
-    else:
-        pyxel.rect(sx + 8, sy + 24, 5, 4, COL_FEET)
-        pyxel.rect(sx + 19, sy + 26, 5, 4, COL_FEET)
+    dir_idx = {DOWN: 0, UP: 1, LEFT: 2, RIGHT: 3}[facing]
+    u = (dir_idx * 2 + walk_bob) * 32
+    pyxel.blt(sx, sy, 0, u, 64, 32, 32, 2)  # colkey=2 for transparency
 
 
 def view(model: Model):
@@ -756,6 +467,7 @@ class App:
             fps=60,
             display_scale=1,
         )
+        pyxel.load("pocket_world.pyxres", excl_sounds=True, excl_musics=True, excl_tilemaps=True)
         define_sounds()
         self.model, cmds = init()
         self._process_cmds(cmds)
