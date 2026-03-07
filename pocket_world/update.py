@@ -2,7 +2,9 @@ from dataclasses import replace
 
 from .constants import (
     MAP_W, MAP_H, Point,
-    WATER, O2_MAX, O2_BREATHE_REFILL, O2_AUTO_REFILL_RATE,
+    WATER, DIRT, EDIBLE_PLANT_TILES,
+    O2_MAX, O2_BREATHE_REFILL, O2_AUTO_REFILL_RATE,
+    HUNGER_MAX, HUNGER_DRAIN_RATE, HUNGER_EAT_PLANT_REFILL,
     O2_LUNGS_UNDERWATER_CHUNK, LUNGS, GILLS, DOWN,
     MOVE_DELAY_LAND, MOVE_DELAY_WATER,
     DEATH_SCREEN_MIN_FRAMES, REWIND_DURATION,
@@ -13,7 +15,7 @@ from .constants import (
 from .model import Model, ThoughtBubble
 from .messages import (
     Msg, Tick, MoveDir, StartGame, TypeChar, Backspace,
-    MapGenerated, Breathe, ToggleBreathingMode, Die,
+    MapGenerated, Breathe, ToggleBreathingMode, EatPlant, Die,
     DismissDeathScreen, RewindTick,
 )
 from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound
@@ -31,6 +33,7 @@ def init() -> tuple[Model, list[Cmd]]:
         seed_input="",
         frame=0,
         o2=O2_MAX,
+        hunger=HUNGER_MAX,
         breathing_mode=GILLS,
         cycle=1,
         death_reason="",
@@ -67,18 +70,33 @@ def _find_spawn(tilemap: tuple[tuple[int, ...], ...]) -> Point:
     return Point(cx, cy)
 
 
+def _set_tile(
+    tilemap: tuple[tuple[int, ...], ...],
+    pos: Point,
+    tile: int,
+) -> tuple[tuple[int, ...], ...]:
+    """Return a new tilemap with one tile replaced at pos."""
+    rows = list(tilemap)
+    row = list(rows[pos.y])
+    row[pos.x] = tile
+    rows[pos.y] = tuple(row)
+    return tuple(rows)
+
+
 def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
     match msg:
         case Tick():
             if model.state == "dead":
                 return replace(model, death_timer=model.death_timer + 1, frame=model.frame + 1), []
             new_o2 = model.o2
+            new_hunger = model.hunger
             new_thought = model.thought
             new_seen = model.seen_memories
             new_cooldown = model.thought_cooldown
             cmds: list[Cmd] = []
             if model.state == "play" and model.tilemap:
                 underwater = model.tilemap[model.player_pos.y][model.player_pos.x] == WATER
+                new_hunger = max(0, new_hunger - HUNGER_DRAIN_RATE)
                 can_auto_breathe = (model.breathing_mode == LUNGS and not underwater)
                 lungs_underwater = (model.breathing_mode == LUNGS and underwater)
                 if can_auto_breathe:
@@ -98,8 +116,20 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                         model,
                         frame=model.frame + 1,
                         o2=0,
+                        hunger=new_hunger,
                         state="dead",
                         death_reason=reason,
+                        death_timer=0,
+                    ), []
+
+                if new_hunger <= 0:
+                    return replace(
+                        model,
+                        frame=model.frame + 1,
+                        o2=new_o2,
+                        hunger=0,
+                        state="dead",
+                        death_reason="Starved",
                         death_timer=0,
                     ), []
 
@@ -132,6 +162,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 move_timer=max(0, model.move_timer - 1),
                 frame=model.frame + 1,
                 o2=new_o2,
+                hunger=new_hunger,
                 thought=new_thought,
                 seen_memories=new_seen,
                 thought_cooldown=new_cooldown,
@@ -170,6 +201,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 move_timer=0,
                 state="play",
                 o2=O2_MAX,
+                hunger=HUNGER_MAX,
                 breathing_mode=GILLS,
                 learned=(),
                 death_reason="",
@@ -207,6 +239,19 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             return replace(
                 model, breathing_mode=new_mode,
                 learned=_add_learned(model, skill),
+            ), []
+
+        case EatPlant():
+            if model.state != "play" or not model.tilemap:
+                return model, []
+            current_tile = model.tilemap[model.player_pos.y][model.player_pos.x]
+            if current_tile not in EDIBLE_PLANT_TILES:
+                return model, []
+            return replace(
+                model,
+                tilemap=_set_tile(model.tilemap, model.player_pos, DIRT),
+                hunger=min(HUNGER_MAX, model.hunger + HUNGER_EAT_PLANT_REFILL),
+                learned=_add_learned(model, "eating plants"),
             ), []
 
         case Die(reason=r):

@@ -38,6 +38,15 @@ O2_MAX = 20 * 60  # 40 seconds at 60fps
 O2_BREATHE_REFILL = 10 * 60  # 20 seconds refill per key press
 O2_AUTO_REFILL_RATE = 4  # frames of O2 restored per frame when auto-breathing
 O2_LUNGS_UNDERWATER_CHUNK = 3 * 60  # 3 seconds of O2 lost per gulp (every second)
+O2_EAT_PLANT_REFILL = 4 * 60  # O2 restored when eating an edible plant
+
+# Hunger system
+HUNGER_MAX = 30 * 60  # 30 seconds at 60fps
+HUNGER_DRAIN_RATE = 1  # frames of hunger lost per frame
+HUNGER_EAT_PLANT_REFILL = 10 * 60  # hunger restored when eating an edible plant
+
+# Plant eating
+EDIBLE_PLANT_TILES = (FLOWERS, BUSH)
 
 # Death screen / rewind
 DEATH_SCREEN_MIN_FRAMES = 60  # minimum frames before ENTER accepted

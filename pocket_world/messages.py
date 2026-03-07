@@ -50,6 +50,11 @@ class ToggleBreathingMode(Msg):
 
 
 @dataclass(frozen=True)
+class EatPlant(Msg):
+    pass
+
+
+@dataclass(frozen=True)
 class Die(Msg):
     reason: str
 

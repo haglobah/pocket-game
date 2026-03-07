@@ -7,7 +7,7 @@ from .constants import (
     WATER, GRASS, TALL_GRASS, FLOWERS, DIRT, SAND, TREE, ROCK, BUSH,
     UP, DOWN, LEFT, RIGHT,
     UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT, DIR_NAME,
-    LUNGS, O2_MAX, DEATH_SCREEN_MIN_FRAMES, REWIND_DURATION,
+    LUNGS, O2_MAX, HUNGER_MAX, DEATH_SCREEN_MIN_FRAMES, REWIND_DURATION,
     THOUGHT_CHAR_SPEED,
 )
 from .model import Model, ThoughtBubble
@@ -335,12 +335,13 @@ def view_play(model: Model):
     can_auto_breathe = (model.breathing_mode == LUNGS and not underwater)
     # Show bar unless lungs mode on land with full O2
     show_o2 = not (can_auto_breathe and model.o2 >= O2_MAX)
+    hud_font = _get_hud_font()
+    bar_w = 140
+    bar_h = 12
+    bar_x = (SCREEN_W - bar_w) // 2
+    bar_y = 10
+
     if show_o2:
-        hud_font = _get_hud_font()
-        bar_w = 140
-        bar_h = 12
-        bar_x = (SCREEN_W - bar_w) // 2
-        bar_y = 10
         o2_frac = model.o2 / O2_MAX
         # Background
         pyxel.rect(bar_x - 1, bar_y - 1, bar_w + 2, bar_h + 2, 0)
@@ -350,6 +351,14 @@ def view_play(model: Model):
         # Label
         mode_label = "LUNGS" if model.breathing_mode == LUNGS else "GILLS"
         pyxel.text(bar_x + bar_w + 8, bar_y - 1, f"O2 [{mode_label}]", 7, hud_font)
+
+    # Hunger bar should always be visible.
+    hunger_y = bar_y + bar_h + 6 if show_o2 else bar_y
+    hunger_frac = model.hunger / HUNGER_MAX
+    pyxel.rect(bar_x - 1, hunger_y - 1, bar_w + 2, bar_h + 2, 0)
+    hunger_fill = 10 if hunger_frac > 0.5 else (9 if hunger_frac > 0.25 else 8)
+    pyxel.rect(bar_x, hunger_y, int(bar_w * hunger_frac), bar_h, hunger_fill)
+    pyxel.text(bar_x + bar_w + 8, hunger_y - 1, "HUNGER", 7, hud_font)
 
     # Debug panel below map
     map_bottom = VIEWPORT_H * TILE_SIZE
@@ -365,7 +374,7 @@ def view_play(model: Model):
         f"seed:{model.seed}  state:{model.state}",
         f"pos:({px},{py})  facing:{DIR_NAME.get(model.facing, '?')}  tile:{standing_on}",
         f"move_timer:{model.move_timer}  frame:{model.frame}",
-        f"map:{MAP_W}x{MAP_H}  o2:{model.o2 // 60}s  mode:{model.breathing_mode}",
+        f"map:{MAP_W}x{MAP_H}  o2:{model.o2 // 60}s  hunger:{model.hunger // 60}s  mode:{model.breathing_mode}",
     ]
     for line in lines:
         pyxel.text(2, y, line, 7)

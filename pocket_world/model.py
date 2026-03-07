@@ -22,6 +22,7 @@ class Model:
     seed_input: str  # text input on title screen
     frame: int  # animation frame counter
     o2: int  # O2 in frames remaining (max O2_MAX)
+    hunger: int  # hunger in frames remaining (max HUNGER_MAX)
     breathing_mode: str  # LUNGS or GILLS
     cycle: int  # current cycle number (starts at 1)
     death_reason: str  # reason of death for death screen

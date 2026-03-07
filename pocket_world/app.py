@@ -6,7 +6,7 @@ import pyxel
 from .constants import SCREEN_W, SCREEN_H, Point
 from .messages import (
     Msg, Tick, MoveDir, StartGame, TypeChar, Backspace, MapGenerated,
-    Breathe, ToggleBreathingMode, DismissDeathScreen, RewindTick,
+    Breathe, ToggleBreathingMode, EatPlant, DismissDeathScreen, RewindTick,
 )
 from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound
 from .mapgen import generate_map
@@ -100,6 +100,8 @@ class App:
                 msgs.append(MoveDir(direction=Point(dx, dy)))
             if pyxel.btnp(pyxel.KEY_SPACE):
                 msgs.append(Breathe())
+            if pyxel.btnp(pyxel.KEY_E):
+                msgs.append(EatPlant())
             if pyxel.btnp(pyxel.KEY_B):
                 msgs.append(ToggleBreathingMode())
 
