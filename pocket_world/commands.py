@@ -24,3 +24,7 @@ class PlaySwimSound(Cmd):
 @dataclass(frozen=True)
 class PlayThoughtSound(Cmd):
     pass
+
+@dataclass(frozen=True)
+class PlayEatingSound(Cmd):
+    pass

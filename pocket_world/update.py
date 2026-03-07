@@ -49,7 +49,7 @@ from .messages import (
     DismissDeathScreen,
     RewindTick,
 )
-from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound
+from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound
 from .thoughts import check_triggers, get_memory
 
 
@@ -325,7 +325,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     model,
                     hunger=new_hunger,
                     learned=_add_learned(model, "eating plants"),
-                ), []
+                ), [PlayEatingSound()]
             return model, []
 
         case ToggleMinimap():

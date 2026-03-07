@@ -20,7 +20,7 @@ from .messages import (
     DismissDeathScreen,
     RewindTick,
 )
-from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound
+from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound
 from .mapgen import generate_map
 from .update import update
 from .view import view
@@ -39,31 +39,23 @@ def interpret_cmd(cmd: Cmd) -> list[Msg]:
             tm = generate_map(s)
             return [MapGenerated(tilemap=tm, seed=s)]
         case PlayStepSound():
-            pyxel.play(3, 0)
+            pyxel.play(0, 16)
         case PlaySwimSound():
-            pyxel.play(3, 0)
+            pyxel.play(0, 17)
         case PlayThoughtSound():
-            pyxel.play(2, 1)
+            pyxel.play(0  , 18)
+        case PlayEatingSound():
+            pyxel.play(0  ,31)
     return []
 
 
 def define_sounds():
     # Soft footstep sound
-    pyxel.sounds[0].set(
-        notes="c2",
-        tones="n",
-        volumes="2",
-        effects="f",
-        speed=5,
-    )
+    pyxel.sounds[16].pcm(str(_PROJECT_ROOT / "assets/audio/16_steps.ogg"))
     # Thought bubble chime — gentle ascending two-note
-    pyxel.sounds[1].set(
-        notes="e3g3",
-        tones="s",
-        volumes="32",
-        effects="f",
-        speed=10,
-    )
+    pyxel.sounds[17].pcm(str(_PROJECT_ROOT / "assets/audio/17_water_bubble.ogg"))
+    # Eating sound
+    pyxel.sounds[31].pcm(str(_PROJECT_ROOT / "assets/audio/31_bite.ogg"))
 
 
 class App:
@@ -77,7 +69,7 @@ class App:
         )
         pyxel.load(
             str(_PROJECT_ROOT / "pocket_world.pyxres"),
-            exclude_sounds=True,
+            exclude_sounds=False,
             exclude_musics=True,
             exclude_tilemaps=True,
         )
