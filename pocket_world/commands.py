@@ -37,3 +37,7 @@ class PlayMainThemeMusic(Cmd):
 @dataclass(frozen=True)
 class PlayBossThemeMusic(Cmd):
     pass
+
+@dataclass(frozen=True)
+class PlayTitleThemeMusic(Cmd):
+    pass

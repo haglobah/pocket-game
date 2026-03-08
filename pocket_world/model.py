@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+
+from pocket_world.commands import PlayTitleThemeMusic
 from .constants import (
     MAP_W,
     MAP_H,
@@ -114,4 +116,4 @@ def init() -> tuple[Model, list]:
             show_minimap=False,
         ),
     )
-    return model, []
+    return model, [PlayTitleThemeMusic()]

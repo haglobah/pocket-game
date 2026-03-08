@@ -43,7 +43,9 @@ def interpret_cmd(cmd: Cmd) -> list[Msg]:
         case PlayMainThemeMusic():
             pyxel.play(0, 0, loop=True)
         case PlayBossThemeMusic():
-            pyxel.play(0, 1)
+            pyxel.play(0, 1, loop=True)
+        case PlayTitleThemeMusic():
+            pyxel.play(0, 2, loop=True)
         case PlayStepSound():
             pyxel.play(1, 16)
         case PlaySwimSound():
@@ -60,6 +62,8 @@ def define_sounds():
     pyxel.sounds[0].pcm(str(_PROJECT_ROOT / "assets/audio/00_soundtrack_main.wav"))
     # Boss theme music
     pyxel.sounds[1].pcm(str(_PROJECT_ROOT / "assets/audio/01_soundtrack_boss_fight.wav"))
+    # Title screen music
+    pyxel.sounds[2].pcm(str(_PROJECT_ROOT / "assets/audio/02_titlescreen_loud.wav"))
     # Soft footstep sound
     pyxel.sounds[16].pcm(str(_PROJECT_ROOT / "assets/audio/16_steps.ogg"))
     # Thought bubble chime — gentle ascending two-note

@@ -2,7 +2,7 @@
 ## 0-15 Music
 0 - main soundtrack
 1 - boss fight soundtrack
-2 - Welcome Screen track
+2 - Title Screen track
 3 - Death Screen track
 ## 16-53 sound effects
 ### Movement
