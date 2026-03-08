@@ -1,0 +1,12 @@
+[project]
+name = "pocket-game"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "arcade>=3.3.3",
+    "mido>=1.3.3",
+    "numpy>=2.4.2",
+    "pillow>=11.3",
+    "python-rtmidi>=1.5.8",
+    "pyxel>=2.7.7",
+]
