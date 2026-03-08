@@ -82,7 +82,7 @@ def define_sounds():
     audio = _PROJECT_ROOT / "assets" / "audio"
     _load_sound("main_theme", str(audio / "00_soundtrack_main.wav"))
     _load_sound("boss_theme", str(audio / "01_soundtrack_boss_fight.wav"))
-    _load_sound("title_theme", str(audio / "02_titlescreen_loud.wav"))
+    _load_sound("title_theme", str(audio / "02_titlescreen_new.wav"))
     _load_sound("death_theme", str(audio / "03_death_screen_track.wav"))
     _load_sound("step", str(audio / "16_steps.ogg"))
     _load_sound("swim", str(audio / "17_water_bubble.ogg"))
