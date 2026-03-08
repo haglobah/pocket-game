@@ -9,6 +9,11 @@ class Cmd:
 @dataclass(frozen=True)
 class GenerateMap(Cmd):
     seed: int
+    
+@dataclass(frozen=True)
+class GenerateDarkWorld(Cmd):
+    seed: int
+    tilemap: tuple
 
 # SOUNDS --------------------------------------------------------------------------
 
@@ -49,12 +54,6 @@ class PlayDeathScreenMusic(Cmd):
 
 
 @dataclass(frozen=True)
-class GenerateDarkWorld(Cmd):
-    seed: int
-    tilemap: tuple
-
-
-@dataclass(frozen=True)
 class PlayPunchSound(Cmd):
     pass
 
@@ -68,7 +67,26 @@ class PlayHitSound(Cmd):
 class PlayBossFireSound(Cmd):
     pass
 
-
 @dataclass(frozen=True)
 class PlayVictorySound(Cmd):
+    pass
+
+@dataclass(frozen=True)
+class PlayDrowningSound(Cmd):
+    pass
+
+@dataclass(frozen=True)
+class PlaySuffocatingSound(Cmd):
+    pass
+
+@dataclass(frozen=True)
+class PlayDehydrationSound(Cmd):
+    pass
+
+@dataclass(frozen=True)
+class PlayStarvationSound(Cmd):
+    pass
+
+@dataclass(frozen=True)
+class PlayKilledByEnemySound(Cmd):
     pass

@@ -30,6 +30,8 @@ from .commands import (
     Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound,
     GenerateDarkWorld, PlayPunchSound, PlayHitSound, PlayBossFireSound, PlayVictorySound,
     PlayMainThemeMusic, PlayBossThemeMusic, PlayTitleThemeMusic, PlayDeathScreenMusic,
+    PlayDrowningSound, PlaySuffocatingSound, PlayDehydrationSound, PlayStarvationSound, 
+    PlayKilledByEnemySound
 )
 from .mapgen import generate_map, generate_dark_world
 from .update import update
@@ -84,14 +86,14 @@ def define_sounds():
     _load_sound("death_theme", str(audio / "03_death_screen_track.wav"))
     _load_sound("step", str(audio / "16_steps.ogg"))
     _load_sound("swim", str(audio / "17_water_bubble.ogg"))
+    _load_sound("drowning", str(audio / "23_drowning.ogg"))
+    _load_sound("suffocating", str(audio / "24_suffocating.ogg"))
+    _load_sound("dehydration", str(audio / "25_dehydration.ogg"))
+    _load_sound("starvation", str(audio / "26_starvation.ogg"))
+    _load_sound("killed_by_enemy", str(audio / "27_killed_by_enemy.ogg"))
     _load_sound("bite", str(audio / "31_bite.ogg"))
     _load_sound("thought", str(audio / "47_thought_bubble.ogg"))
-    # Synthesized sounds — use closest available or skip
-    # punch, hit, boss_fire, victory were pyxel.sounds[n].set() — no wav file
-    # We'll try to load from ogg files if they exist, otherwise skip
     _load_sound("punch", str(audio / "41_punch.ogg"))
-    # hit, boss_fire, victory don't have asset files — they were synthesized in pyxel
-    # We'll leave them as missing (silent) unless asset files are added
 
 
 def interpret_cmd(cmd: Cmd) -> list[Msg]:
@@ -117,6 +119,16 @@ def interpret_cmd(cmd: Cmd) -> list[Msg]:
             _play_sound("swim")
         case PlayThoughtSound():
             _play_sound("thought")
+        case PlayDrowningSound():
+            _play_sound("drowning")
+        case PlaySuffocatingSound():
+            _play_sound("suffocating")
+        case PlayDehydrationSound():
+            _play_sound("dehydration")
+        case PlayStarvationSound():
+            _play_sound("starvation")
+        case PlayKilledByEnemySound():
+            _play_sound("killed_by_enemy")
         case PlayEatingSound():
             _play_sound("bite")
         case PlayPunchSound():
