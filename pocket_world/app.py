@@ -20,6 +20,7 @@ from .messages import (
     DismissDeathScreen,
     RewindTick,
     SetSprinting,
+    ChooseWizardOption,
 )
 from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound
 from .mapgen import generate_map
@@ -122,6 +123,10 @@ class App:
                 msgs.append(Eat())
             if pyxel.btnp(pyxel.KEY_M):
                 msgs.append(ToggleMinimap())
+            if pyxel.btnp(pyxel.KEY_1):
+                msgs.append(ChooseWizardOption(option=1))
+            if pyxel.btnp(pyxel.KEY_2):
+                msgs.append(ChooseWizardOption(option=2))
             msgs.append(SetSprinting(active=pyxel.btn(pyxel.KEY_C)))
 
         elif self.model.game.state == "dead":

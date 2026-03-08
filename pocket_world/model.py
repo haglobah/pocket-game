@@ -28,6 +28,15 @@ class NpcDialogueBubble:
 
 
 @dataclass(frozen=True)
+class WizardShot:
+    x: float
+    y: float
+    vx: float
+    vy: float
+    ttl: int
+
+
+@dataclass(frozen=True)
 class Player:
     pos: Point
     facing: Point
@@ -63,10 +72,16 @@ class Game:
     frame: int
     thought: ThoughtBubble | None
     wise_dialogue: NpcDialogueBubble | None
+    wise_options: tuple[str, str] | None
+    wise_dialogue_active: bool
+    wise_dialogue_node: str
+    wise_outcome: str  # "none" | "attack" | "follow"
     seen_memories: tuple[str, ...]
     thought_cooldown: int
     wise_dialogue_cooldown: int
     wise_dialogue_index: int
+    wizard_shots: tuple[WizardShot, ...]
+    wizard_attack_cooldown: int
     show_minimap: bool
 
 
@@ -109,10 +124,16 @@ def init() -> tuple[Model, list]:
             frame=0,
             thought=None,
             wise_dialogue=None,
+            wise_options=None,
+            wise_dialogue_active=False,
+            wise_dialogue_node="",
+            wise_outcome="none",
             seen_memories=(),
             thought_cooldown=0,
             wise_dialogue_cooldown=0,
             wise_dialogue_index=0,
+            wizard_shots=(),
+            wizard_attack_cooldown=0,
             show_minimap=False,
         ),
     )

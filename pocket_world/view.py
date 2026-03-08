@@ -495,7 +495,13 @@ def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
         ty += line_h
 
 
-def _draw_dialogue_bubble(cx: int, bottom_y: int, text: str, timer: int):
+def _draw_dialogue_bubble(
+    cx: int,
+    bottom_y: int,
+    text: str,
+    timer: int,
+    options: tuple[str, str] | None = None,
+):
     """Draw a speech bubble for NPC dialogue, using thought-bubble typography."""
     chars_shown = min(len(text), timer // WISE_DIALOG_CHAR_SPEED)
     display_text = text[:chars_shown]
@@ -505,6 +511,10 @@ def _draw_dialogue_bubble(cx: int, bottom_y: int, text: str, timer: int):
     thought_font = _get_thought_font()
     max_text_w = 260
     lines = _wrap_text_by_width(display_text, max_text_w, thought_font)
+    if options is not None:
+        lines.append("")
+        lines.append(f"[1] {options[0]}")
+        lines.append(f"[2] {options[1]}")
     fh = _THOUGHT_FONT_SIZE if thought_font else pyxel.FONT_HEIGHT
     line_h = fh + 4
 
@@ -623,7 +633,16 @@ def view_play(model: Model):
                 wise_top - 6,
                 model.game.wise_dialogue.text,
                 model.game.wise_dialogue.timer,
+                model.game.wise_options if model.game.wise_dialogue_active else None,
             )
+
+    # Hostile wizard projectiles (drawn as blue pixels and a bright core).
+    for shot in model.game.wizard_shots:
+        shot_sx = int(shot.x - cam_x * TILE_SIZE)
+        shot_sy = int(shot.y - cam_y * TILE_SIZE)
+        if 0 <= shot_sx < SCREEN_W and 0 <= shot_sy < VIEWPORT_H * TILE_SIZE:
+            pyxel.pset(shot_sx, shot_sy, 12)
+            pyxel.pset(shot_sx + 1, shot_sy, 5)
 
     # Draw player at center of screen
     pcx = (VIEWPORT_W // 2) * TILE_SIZE

@@ -1,4 +1,5 @@
 from dataclasses import replace
+from math import hypot
 
 from .constants import (
     MAP_W,
@@ -28,6 +29,12 @@ from .constants import (
     WISE_DIALOG_COOLDOWN_FRAMES,
     WISE_DIALOG_INITIAL_DELAY,
     WISE_IDLE_LINES,
+    WISE_TALK_DISTANCE,
+    WISE_FOLLOW_STEP_FRAMES,
+    WISE_ATTACK_SHOT_SPEED,
+    WISE_ATTACK_SHOT_TTL,
+    WISE_ATTACK_COOLDOWN_FRAMES,
+    WISE_ATTACK_O2_DAMAGE,
     HYDRATION_MAX,
     HYDRATION_REFILL,
     HYDRATION_DEPLETION,
@@ -41,7 +48,7 @@ from .constants import (
     is_walkable,
     is_swimmable,
 )
-from .model import Model, Map, ThoughtBubble, NpcDialogueBubble
+from .model import Model, Map, ThoughtBubble, NpcDialogueBubble, WizardShot
 from .messages import (
     Msg,
     Tick,
@@ -59,9 +66,102 @@ from .messages import (
     DismissDeathScreen,
     RewindTick,
     SetSprinting,
+    ChooseWizardOption,
 )
 from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound
 from .thoughts import check_triggers, get_memory
+
+
+# node_id -> (wizard_text, option_1_text, option_2_text, next_on_1, next_on_2)
+WIZARD_DIALOGUE_TREE: dict[str, tuple[str, str, str, str, str]] = {
+    "opening": (
+        "Traveler, the dunes remember your footsteps. Why do you return?",
+        "I want to survive this loop.",
+        "Your tricks are why I'm trapped.",
+        "survive_1",
+        "blame_1",
+    ),
+    "survive_1": (
+        "Then choose: guidance with trust, or guidance with suspicion?",
+        "I trust you. Teach me.",
+        "Teach me, but I watch you.",
+        "follow_end",
+        "attack_end",
+    ),
+    "blame_1": (
+        "Accusation sharpens magic. Do you seek peace, or challenge?",
+        "Peace. Let's work together.",
+        "Challenge. Show me your power.",
+        "follow_end",
+        "attack_end",
+    ),
+}
+
+
+def _start_wizard_dialogue(game):
+    text, option_1, option_2, _, _ = WIZARD_DIALOGUE_TREE["opening"]
+    duration = len(text) * WISE_DIALOG_CHAR_SPEED + WISE_DIALOG_READ_FRAMES
+    return replace(
+        game,
+        wise_dialogue_active=True,
+        wise_dialogue_node="opening",
+        wise_options=(option_1, option_2),
+        wise_dialogue=NpcDialogueBubble(text=text, timer=0, duration=duration),
+    )
+
+
+def _wizard_distance_tiles(player_pos: Point, wise_pos: Point) -> int:
+    return max(abs(player_pos.x - wise_pos.x), abs(player_pos.y - wise_pos.y))
+
+
+def _pick_follower_tile(tilemap: tuple[tuple[int, ...], ...], wise_pos: Point, player_pos: Point) -> Point:
+    """Step wise man one tile toward player if the destination is walkable."""
+    dx = 0 if player_pos.x == wise_pos.x else (1 if player_pos.x > wise_pos.x else -1)
+    dy = 0 if player_pos.y == wise_pos.y else (1 if player_pos.y > wise_pos.y else -1)
+    for sx, sy in ((dx, dy), (dx, 0), (0, dy), (0, 0)):
+        nx, ny = wise_pos.x + sx, wise_pos.y + sy
+        if 0 <= nx < MAP_W and 0 <= ny < MAP_H and is_walkable(tilemap[ny][nx]):
+            if nx == player_pos.x and ny == player_pos.y:
+                continue
+            return Point(nx, ny)
+    return wise_pos
+
+
+def _spawn_wizard_shot(wise_pos: Point, player_pos: Point) -> WizardShot:
+    """Create one blue bolt from the wizard toward the player's current position."""
+    start_x = wise_pos.x * 32 + 8
+    start_y = wise_pos.y * 32 + 10
+    target_x = player_pos.x * 32 + 16
+    target_y = player_pos.y * 32 + 16
+    dx = float(target_x - start_x)
+    dy = float(target_y - start_y)
+    dist = max(1.0, hypot(dx, dy))
+    return WizardShot(
+        x=start_x,
+        y=start_y,
+        vx=(dx / dist) * WISE_ATTACK_SHOT_SPEED,
+        vy=(dy / dist) * WISE_ATTACK_SHOT_SPEED,
+        ttl=WISE_ATTACK_SHOT_TTL,
+    )
+
+
+def _advance_wizard_shots(shots: tuple[WizardShot, ...], player_pos: Point) -> tuple[tuple[WizardShot, ...], int]:
+    """Move wizard shots and return updated tuple + O2 damage dealt this tick."""
+    hit_damage = 0
+    updated: list[WizardShot] = []
+    player_x = player_pos.x * 32 + 16
+    player_y = player_pos.y * 32 + 16
+    for shot in shots:
+        nx = shot.x + shot.vx
+        ny = shot.y + shot.vy
+        ttl = shot.ttl - 1
+        if ttl <= 0:
+            continue
+        if abs(nx - player_x) <= 10 and abs(ny - player_y) <= 14:
+            hit_damage += WISE_ATTACK_O2_DAMAGE
+            continue
+        updated.append(replace(shot, x=nx, y=ny, ttl=ttl))
+    return tuple(updated), hit_damage
 
 
 def _add_learned(cycle, skill: str) -> tuple[str, ...]:
@@ -129,12 +229,31 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             new_o2 = player.o2
             new_thought = game.thought
             new_wise_dialogue = game.wise_dialogue
+            new_wise_options = game.wise_options
+            new_wise_dialogue_active = game.wise_dialogue_active
+            new_wise_dialogue_node = game.wise_dialogue_node
+            new_wise_outcome = game.wise_outcome
             new_seen = game.seen_memories
             new_cooldown = game.thought_cooldown
             new_wise_dialogue_cooldown = game.wise_dialogue_cooldown
             new_wise_dialogue_index = game.wise_dialogue_index
+            new_wizard_shots = game.wizard_shots
+            new_wizard_attack_cooldown = game.wizard_attack_cooldown
+            new_map = map_
             cmds: list[Cmd] = []
             if game.state == "play" and map_.tilemap:
+                # Trigger the branching wizard conversation the first time player comes close.
+                if (
+                    new_wise_outcome == "none"
+                    and not new_wise_dialogue_active
+                    and _wizard_distance_tiles(player.pos, map_.wise_man) <= WISE_TALK_DISTANCE
+                ):
+                    staged = _start_wizard_dialogue(game)
+                    new_wise_dialogue_active = staged.wise_dialogue_active
+                    new_wise_dialogue_node = staged.wise_dialogue_node
+                    new_wise_options = staged.wise_options
+                    new_wise_dialogue = staged.wise_dialogue
+
                 underwater = is_swimmable(map_.tilemap[player.pos.y][player.pos.x])
                 can_auto_breathe = player.breathing_mode == LUNGS and not underwater
                 lungs_underwater = player.breathing_mode == LUNGS and underwater
@@ -183,21 +302,48 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                         )
                         cmds.append(PlayThoughtSound())
 
-                # Wise-man idle dialogue management
-                new_wise_dialogue_cooldown = max(0, new_wise_dialogue_cooldown - 1)
-                if new_wise_dialogue is not None:
-                    new_timer = new_wise_dialogue.timer + 1
-                    if new_timer >= new_wise_dialogue.duration:
-                        new_wise_dialogue = None
-                        new_wise_dialogue_cooldown = WISE_DIALOG_COOLDOWN_FRAMES
+                # Wise-man dialogue: branch conversation while active, otherwise idle chatter.
+                if new_wise_dialogue_active:
+                    if new_wise_dialogue is not None:
+                        new_wise_dialogue = replace(
+                            new_wise_dialogue,
+                            timer=min(new_wise_dialogue.duration, new_wise_dialogue.timer + 1),
+                        )
+                else:
+                    new_wise_dialogue_cooldown = max(0, new_wise_dialogue_cooldown - 1)
+                    if new_wise_dialogue is not None:
+                        new_timer = new_wise_dialogue.timer + 1
+                        if new_timer >= new_wise_dialogue.duration:
+                            new_wise_dialogue = None
+                            new_wise_dialogue_cooldown = WISE_DIALOG_COOLDOWN_FRAMES
+                        else:
+                            new_wise_dialogue = replace(new_wise_dialogue, timer=new_timer)
+                    elif new_wise_dialogue_cooldown == 0 and WISE_IDLE_LINES and new_wise_outcome == "none":
+                        text = WISE_IDLE_LINES[new_wise_dialogue_index % len(WISE_IDLE_LINES)]
+                        duration = len(text) * WISE_DIALOG_CHAR_SPEED + WISE_DIALOG_READ_FRAMES
+                        new_wise_dialogue = NpcDialogueBubble(text=text, timer=0, duration=duration)
+                        new_wise_dialogue_index = (new_wise_dialogue_index + 1) % len(WISE_IDLE_LINES)
+                        cmds.append(PlayThoughtSound())
+
+                # End states: attack (blue bolts) or follow.
+                if new_wise_outcome == "attack":
+                    new_wizard_shots, shot_damage = _advance_wizard_shots(new_wizard_shots, player.pos)
+                    new_o2 = max(0, new_o2 - shot_damage)
+                    if new_wizard_attack_cooldown <= 0:
+                        new_wizard_shots = new_wizard_shots + (_spawn_wizard_shot(map_.wise_man, player.pos),)
+                        new_wizard_attack_cooldown = WISE_ATTACK_COOLDOWN_FRAMES
                     else:
-                        new_wise_dialogue = replace(new_wise_dialogue, timer=new_timer)
-                elif new_wise_dialogue_cooldown == 0 and WISE_IDLE_LINES:
-                    text = WISE_IDLE_LINES[new_wise_dialogue_index % len(WISE_IDLE_LINES)]
-                    duration = len(text) * WISE_DIALOG_CHAR_SPEED + WISE_DIALOG_READ_FRAMES
-                    new_wise_dialogue = NpcDialogueBubble(text=text, timer=0, duration=duration)
-                    new_wise_dialogue_index = (new_wise_dialogue_index + 1) % len(WISE_IDLE_LINES)
-                    cmds.append(PlayThoughtSound())
+                        new_wizard_attack_cooldown -= 1
+                    if new_o2 <= 0:
+                        return replace(model,
+                            player=replace(player, o2=0),
+                            cycle=replace(cycle, death_reason="The wizard's blue bolts drained your oxygen", death_timer=0),
+                            game=replace(game, frame=game.frame + 1, state="dead"),
+                        ), []
+                elif new_wise_outcome == "follow":
+                    if game.frame % WISE_FOLLOW_STEP_FRAMES == 0:
+                        next_wise = _pick_follower_tile(map_.tilemap, map_.wise_man, player.pos)
+                        new_map = replace(map_, wise_man=next_wise)
 
             # Deplete hydration and hunger
             new_hydration = max(0, player.hydration - HYDRATION_DEPLETION)
@@ -222,14 +368,21 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     hydration=new_hydration,
                     hunger=new_hunger,
                 ),
+                map=new_map,
                 game=replace(game,
                     frame=game.frame + 1,
                     thought=new_thought,
                     wise_dialogue=new_wise_dialogue,
+                    wise_options=new_wise_options,
+                    wise_dialogue_active=new_wise_dialogue_active,
+                    wise_dialogue_node=new_wise_dialogue_node,
+                    wise_outcome=new_wise_outcome,
                     seen_memories=new_seen,
                     thought_cooldown=new_cooldown,
                     wise_dialogue_cooldown=new_wise_dialogue_cooldown,
                     wise_dialogue_index=new_wise_dialogue_index,
+                    wizard_shots=new_wizard_shots,
+                    wizard_attack_cooldown=new_wizard_attack_cooldown,
                 ),
             ), cmds
 
@@ -269,10 +422,63 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     thought=None,
                     thought_cooldown=THOUGHT_INITIAL_DELAY,
                     wise_dialogue=None,
+                    wise_options=None,
+                    wise_dialogue_active=False,
+                    wise_dialogue_node="",
+                    wise_outcome="none",
                     wise_dialogue_cooldown=WISE_DIALOG_INITIAL_DELAY,
                     wise_dialogue_index=0,
+                    wizard_shots=(),
+                    wizard_attack_cooldown=0,
                 ),
             ), []
+
+        case ChooseWizardOption(option=o):
+            if game.state != "play" or not game.wise_dialogue_active:
+                return model, []
+            if o not in (1, 2):
+                return model, []
+            node = WIZARD_DIALOGUE_TREE.get(game.wise_dialogue_node)
+            if node is None:
+                return model, []
+            _, _, _, next_1, next_2 = node
+            next_node = next_1 if o == 1 else next_2
+
+            if next_node == "attack_end":
+                final_text = "Then defend yourself. My staff speaks in blue lightning."
+                duration = len(final_text) * WISE_DIALOG_CHAR_SPEED + WISE_DIALOG_READ_FRAMES
+                return replace(model, game=replace(game,
+                    wise_dialogue_active=False,
+                    wise_dialogue_node="",
+                    wise_options=None,
+                    wise_outcome="attack",
+                    wise_dialogue=NpcDialogueBubble(text=final_text, timer=0, duration=duration),
+                    wise_dialogue_cooldown=WISE_DIALOG_COOLDOWN_FRAMES,
+                    wizard_attack_cooldown=0,
+                )), [PlayThoughtSound()]
+
+            if next_node == "follow_end":
+                final_text = "Wise choice. Stay close, and I will walk with you."
+                duration = len(final_text) * WISE_DIALOG_CHAR_SPEED + WISE_DIALOG_READ_FRAMES
+                return replace(model, game=replace(game,
+                    wise_dialogue_active=False,
+                    wise_dialogue_node="",
+                    wise_options=None,
+                    wise_outcome="follow",
+                    wise_dialogue=NpcDialogueBubble(text=final_text, timer=0, duration=duration),
+                    wise_dialogue_cooldown=WISE_DIALOG_COOLDOWN_FRAMES,
+                )), [PlayThoughtSound()]
+
+            if next_node not in WIZARD_DIALOGUE_TREE:
+                return model, []
+            text, option_1, option_2, _, _ = WIZARD_DIALOGUE_TREE[next_node]
+            duration = len(text) * WISE_DIALOG_CHAR_SPEED + WISE_DIALOG_READ_FRAMES
+            return replace(model, game=replace(game,
+                wise_dialogue_active=True,
+                wise_dialogue_node=next_node,
+                wise_options=(option_1, option_2),
+                wise_dialogue=NpcDialogueBubble(text=text, timer=0, duration=duration),
+            )), [PlayThoughtSound()]
 
         case TypeChar(char=c):
             if game.state == "title" and len(game.seed_input) < 16:

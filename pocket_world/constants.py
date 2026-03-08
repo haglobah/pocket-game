@@ -97,6 +97,12 @@ WISE_IDLE_LINES = (
     "If you panic, count your breaths, then walk.",
     "Berries and cactus can buy you one more dawn.",
 )
+WISE_TALK_DISTANCE = 3
+WISE_FOLLOW_STEP_FRAMES = 12
+WISE_ATTACK_SHOT_SPEED = 3.0
+WISE_ATTACK_SHOT_TTL = 240
+WISE_ATTACK_COOLDOWN_FRAMES = 24
+WISE_ATTACK_O2_DAMAGE = 300
 
 # Directions
 UP = Point(0, -1)
