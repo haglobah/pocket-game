@@ -297,8 +297,7 @@ def _pset(x: int, y: int, col_idx: int):
 
 def _text(x: int, y: int, text_str: str, col_idx: int, font_size: int = 10):
     color = _col(col_idx)
-    # draw_text anchor_y default is "baseline"; use "top" for pyxel-style coords
-    arcade.draw_text(text_str, x, _ay(y), color, font_size, anchor_y="top")
+    arcade.draw_text(text_str, x, _ay(y), color, font_size, anchor_y="top") # , font_name="Press Start 2P"
 
 
 def _text_width(text_str: str, font_size: int = 10) -> int:
@@ -528,27 +527,28 @@ def view_death(model: Model):
             _center_text(y, "[ENTER] Continue", 7, 24)
 
 
+def _load_hourglass_texture():
+    global _dark_textures
+    if _dark_textures is None:
+        _dark_textures = {}
+    hourglass_path = str(_PROJECT_ROOT / "assets" / "sprites" / "hourglass_frames.png")
+    try:
+        sheet = arcade.SpriteSheet(hourglass_path)
+        for i in range(10):
+            _dark_textures[f"hourglass_{i}"] = sheet.get_texture(LBWH(i * 85, 0, 85, 129))
+    except Exception:
+        pass
+
+
 def _draw_hourglass(cx: int, cy: int, fill_frac: float):
-    hw, hh = 20, 40
-    for i in range(hh):
-        if i < hh // 2:
-            w = int(hw * (1 - i / (hh // 2)))
-            sand_h = int((hh // 2) * (1.0 - fill_frac))
-            col = 9 if i < sand_h else 0
-        else:
-            j = i - hh // 2
-            w = int(hw * (j / (hh // 2)))
-            sand_h = int((hh // 2) * fill_frac)
-            rows_from_bottom = hh - 1 - i
-            col = 9 if rows_from_bottom < sand_h else 0
-        if w > 0:
-            _rect(cx - w, cy - hh // 2 + i, w * 2, 1, col)
-    _line(cx - hw, cy - hh // 2, cx + hw, cy - hh // 2, 7)
-    _line(cx - hw, cy + hh // 2, cx + hw, cy + hh // 2, 7)
-    _line(cx - hw, cy - hh // 2, cx, cy, 7)
-    _line(cx + hw, cy - hh // 2, cx, cy, 7)
-    _line(cx - hw, cy + hh // 2, cx, cy, 7)
-    _line(cx + hw, cy + hh // 2, cx, cy, 7)
+    _load_hourglass_texture()
+    frame_idx = int((fill_frac * 10)) % 10
+    tex_key = f"hourglass_{frame_idx}"
+    if _dark_textures and tex_key in _dark_textures:
+        _blt(cx - 16, cy - 16, _dark_textures[tex_key])
+    else:
+        # Fallback to simple circle if texture unavailable
+        _circ(cx, cy, 8, 9)
 
 
 def view_rewind(model: Model):
