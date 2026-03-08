@@ -157,7 +157,7 @@ class App:
             display_scale=1,
         )
         pyxel.images[0].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "karl_sprites.png"))
-        pyxel.images[1].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "environment_sprites.png"))
+        pyxel.images[1].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "also_without_berries.png"))
         # Keep wise-man sprites in bank 1 to avoid overlap with dark-world sprites in bank 2.
         pyxel.images[1].load(0, 128, str(_PROJECT_ROOT / "assets" / "sprites" / "wise-man-front.png"))
         pyxel.images[1].load(16, 128, str(_PROJECT_ROOT / "assets" / "sprites" / "wise-man-left.png"))
