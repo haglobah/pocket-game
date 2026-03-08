@@ -127,20 +127,22 @@ _minimap_cache_seed: int | None = None
 def draw_tile(sx: int, sy: int, tile: int, frame: int):
     """Draw a 32x32 desert tile at screen pixel position (sx, sy)."""
     if tile == SAND:
-        # Light sand base
-        pyxel.rect(sx, sy, 32, 32, 10)
-        # Subtle dot pattern for texture
-        for i in range(3):
-            dx = ((sx + i * 13) * 7 + sy * 3) % 28 + 2
-            dy = ((sy + i * 11) * 5 + sx * 7) % 28 + 2
-            pyxel.pset(sx + dx, sy + dy, 9)
+        pyxel.blt(sx, sy, 1, 0, 32, 32, 32)
+        # # Light sand base
+        # pyxel.rect(sx, sy, 32, 32, 10)
+        # # Subtle dot pattern for texture
+        # for i in range(3):
+        #     dx = ((sx + i * 13) * 7 + sy * 3) % 28 + 2
+        #     dy = ((sy + i * 11) * 5 + sx * 7) % 28 + 2
+        #     pyxel.pset(sx + dx, sy + dy, 9)
     elif tile == SAND_DARK:
         # Darker sand with ripple texture
-        pyxel.rect(sx, sy, 32, 32, 9)
-        for i in range(4):
-            dx = ((sx + i * 17) * 3 + sy) % 26 + 3
-            dy = ((sy + i * 7) * 11 + sx * 3) % 26 + 3
-            pyxel.pset(sx + dx, sy + dy, 10)
+        pyxel.blt(sx, sy, 1, 96, 0, 32, 32)
+        # pyxel.rect(sx, sy, 32, 32, 9)
+        # for i in range(4):
+        #     dx = ((sx + i * 17) * 3 + sy) % 26 + 3
+        #     dy = ((sy + i * 7) * 11 + sx * 3) % 26 + 3
+        #     pyxel.pset(sx + dx, sy + dy, 10)
     elif tile == CLIFF:
         # Rocky cliff - dark brown with texture
         pyxel.rect(sx, sy, 32, 32, 4)
@@ -164,33 +166,35 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
             dx = ((sx + i * 11) % 28) + 2
             pyxel.pset(sx + dx, sy + 12, 4)
     elif tile == PALM_TREE:
-        # Sand base
-        pyxel.rect(sx, sy, 32, 32, 10)
-        # Trunk
-        pyxel.rect(sx + 14, sy + 12, 4, 20, 4)
-        pyxel.rect(sx + 15, sy + 14, 2, 16, 2)
-        # Fronds (green leaf clusters)
-        pyxel.circ(sx + 16, sy + 10, 8, 3)
-        pyxel.circ(sx + 10, sy + 6, 5, 11)
-        pyxel.circ(sx + 22, sy + 6, 5, 11)
-        pyxel.circ(sx + 16, sy + 3, 5, 3)
-        # Coconuts
-        pyxel.circ(sx + 13, sy + 11, 2, 4)
-        pyxel.circ(sx + 19, sy + 11, 2, 9)
+        pyxel.blt(sx, sy, 1, 96, 32, 32, 32)
+        # # Sand base
+        # pyxel.rect(sx, sy, 32, 32, 10)
+        # # Trunk
+        # pyxel.rect(sx + 14, sy + 12, 4, 20, 4)
+        # pyxel.rect(sx + 15, sy + 14, 2, 16, 2)
+        # # Fronds (green leaf clusters)
+        # pyxel.circ(sx + 16, sy + 10, 8, 3)
+        # pyxel.circ(sx + 10, sy + 6, 5, 11)
+        # pyxel.circ(sx + 22, sy + 6, 5, 11)
+        # pyxel.circ(sx + 16, sy + 3, 5, 3)
+        # # Coconuts
+        # pyxel.circ(sx + 13, sy + 11, 2, 4)
+        # pyxel.circ(sx + 19, sy + 11, 2, 9)
     elif tile == CACTUS:
-        # Sand base
-        pyxel.rect(sx, sy, 32, 32, 10)
-        # Main cactus body
-        pyxel.rect(sx + 12, sy + 8, 8, 22, 3)
-        pyxel.rect(sx + 13, sy + 9, 6, 20, 11)
-        # Left arm
-        pyxel.rect(sx + 6, sy + 12, 6, 6, 3)
-        pyxel.rect(sx + 6, sy + 10, 4, 4, 3)
-        pyxel.rect(sx + 7, sy + 13, 4, 4, 11)
-        # Right arm
-        pyxel.rect(sx + 20, sy + 16, 6, 6, 3)
-        pyxel.rect(sx + 22, sy + 14, 4, 4, 3)
-        pyxel.rect(sx + 21, sy + 17, 4, 4, 11)
+        pyxel.blt(sx, sy, 1, 64, 32, 32, 32)
+        # # Sand base
+        # pyxel.rect(sx, sy, 32, 32, 10)
+        # # Main cactus body
+        # pyxel.rect(sx + 12, sy + 8, 8, 22, 3)
+        # pyxel.rect(sx + 13, sy + 9, 6, 20, 11)
+        # # Left arm
+        # pyxel.rect(sx + 6, sy + 12, 6, 6, 3)
+        # pyxel.rect(sx + 6, sy + 10, 4, 4, 3)
+        # pyxel.rect(sx + 7, sy + 13, 4, 4, 11)
+        # # Right arm
+        # pyxel.rect(sx + 20, sy + 16, 6, 6, 3)
+        # pyxel.rect(sx + 22, sy + 14, 4, 4, 3)
+        # pyxel.rect(sx + 21, sy + 17, 4, 4, 11)
     elif tile == DEAD_BUSH:
         # Sand base with dried bush
         pyxel.rect(sx, sy, 32, 32, 10)
@@ -210,25 +214,27 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
         pyxel.circ(sx + 14, sy + 20, 6, 7)
         pyxel.circ(sx + 18, sy + 24, 5, 5)
     elif tile == WATER:
+        pyxel.blt(sx, sy, 1, 0, 96, 32, 32)
         # Shallow oasis water — light blue with wave lines
-        water_frame = (frame // 80) % 4
-        c1, c2 = 5, 12
-        if water_frame % 2 == 0:
-            c1, c2 = c2, c1
-        pyxel.rect(sx, sy, 32, 32, c1)
-        for i in range(3):
-            wy = sy + 6 + i * 10 + (water_frame * 3) % 8
-            pyxel.line(sx + 4, wy, sx + 28, wy, c2)
+        # water_frame = (frame // 80) % 4
+        # c1, c2 = 5, 12
+        # if water_frame % 2 == 0:
+        #     c1, c2 = c2, c1
+        # pyxel.rect(sx, sy, 32, 32, c1)
+        # for i in range(3):
+        #     wy = sy + 6 + i * 10 + (water_frame * 3) % 8
+        #     pyxel.line(sx + 4, wy, sx + 28, wy, c2)
     elif tile == WATER_DEEP:
-        # Deep oasis water — darker blue/indigo
-        water_frame = (frame // 100) % 4
-        c1, c2 = 1, 5
-        if water_frame % 2 == 0:
-            c1, c2 = c2, c1
-        pyxel.rect(sx, sy, 32, 32, c1)
-        for i in range(2):
-            wy = sy + 8 + i * 14 + (water_frame * 4) % 10
-            pyxel.line(sx + 6, wy, sx + 26, wy, c2)
+        pyxel.blt(sx, sy, 1, 0, 64, 32, 32)
+        # # Deep oasis water — darker blue/indigo
+        # water_frame = (frame // 100) % 4
+        # c1, c2 = 1, 5
+        # if water_frame % 2 == 0:
+        #     c1, c2 = c2, c1
+        # pyxel.rect(sx, sy, 32, 32, c1)
+        # for i in range(2):
+        #     wy = sy + 8 + i * 14 + (water_frame * 4) % 10
+        #     pyxel.line(sx + 6, wy, sx + 26, wy, c2)
     elif tile == BUSH_GREEN:
         # Lush green bush on sand
         pyxel.rect(sx, sy, 32, 32, 10)
@@ -252,18 +258,19 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
         pyxel.pset(sx + 10, sy + 15, 7)
         pyxel.pset(sx + 18, sy + 13, 7)
     elif tile == BUSH_BERRY:
-        # Berry bush — green with red/purple berries
-        pyxel.rect(sx, sy, 32, 32, 10)
-        # Bush body
-        pyxel.circ(sx + 16, sy + 20, 9, 11)
-        pyxel.circ(sx + 12, sy + 17, 7, 3)
-        pyxel.circ(sx + 20, sy + 18, 6, 11)
-        # Berries
-        pyxel.circ(sx + 10, sy + 16, 2, 8)
-        pyxel.circ(sx + 15, sy + 14, 2, 2)
-        pyxel.circ(sx + 21, sy + 15, 2, 8)
-        pyxel.circ(sx + 13, sy + 20, 2, 2)
-        pyxel.circ(sx + 19, sy + 21, 2, 8)
+        pyxel.blt(sx, sy, 1, 32, 32, 32, 32)
+        # # Berry bush — green with red/purple berries
+        # pyxel.rect(sx, sy, 32, 32, 10)
+        # # Bush body
+        # pyxel.circ(sx + 16, sy + 20, 9, 11)
+        # pyxel.circ(sx + 12, sy + 17, 7, 3)
+        # pyxel.circ(sx + 20, sy + 18, 6, 11)
+        # # Berries
+        # pyxel.circ(sx + 10, sy + 16, 2, 8)
+        # pyxel.circ(sx + 15, sy + 14, 2, 2)
+        # pyxel.circ(sx + 21, sy + 15, 2, 8)
+        # pyxel.circ(sx + 13, sy + 20, 2, 2)
+        # pyxel.circ(sx + 19, sy + 21, 2, 8)
 
 
 def draw_character(sx: int, sy: int, facing, frame: int):
