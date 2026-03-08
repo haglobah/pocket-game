@@ -1,3 +1,5 @@
+import arcade
 from pocket_world.app import App
 
-App()
+app = App()
+arcade.run()
