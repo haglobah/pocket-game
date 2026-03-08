@@ -68,12 +68,8 @@ class App:
             fps=60,
             display_scale=1,
         )
-        pyxel.load(
-            str(_PROJECT_ROOT / "pocket_world.pyxres"),
-            exclude_sounds=False,
-            exclude_musics=True,
-            exclude_tilemaps=True,
-        )
+        pyxel.images[0].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "image0.png"))
+        pyxel.images[1].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "image1.png"))
         define_sounds()
         self.model, cmds = init()
         self._process_cmds(cmds)
