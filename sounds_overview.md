@@ -1,7 +1,9 @@
 # Sound Channel Overvies
 ## 0-15 Music
-0 - melody proto
-1 - bass prot0
+0 - main soundtrack
+1 - boss fight soundtrack
+2 - Welcome Screen track
+3 - Death Screen track
 ## 16-53 sound effects
 ### Movement
 16 - steps on land
@@ -11,8 +13,8 @@
 ### Interactions
 31 - eating
 
-?? - punching
-?? - lightning
+41 - punching
+42 - lightning
 
 ### Environmental
 47 - Thought Bubble

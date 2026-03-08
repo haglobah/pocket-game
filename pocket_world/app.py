@@ -21,7 +21,7 @@ from .messages import (
     RewindTick,
     SetSprinting,
 )
-from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound
+from .commands import *
 from .mapgen import generate_map
 from .update import update
 from .view import view
@@ -39,24 +39,35 @@ def interpret_cmd(cmd: Cmd) -> list[Msg]:
         case GenerateMap(seed=s):
             tm = generate_map(s)
             return [MapGenerated(tilemap=tm, seed=s)]
+        # sounds
+        case PlayMainThemeMusic():
+            pyxel.play(0, 0, loop=True)
+        case PlayBossThemeMusic():
+            pyxel.play(0, 1)
         case PlayStepSound():
-            pyxel.play(0, 16)
+            pyxel.play(1, 16)
         case PlaySwimSound():
-            pyxel.play(0, 17)
+            pyxel.play(1, 17)
         case PlayThoughtSound():
-            pyxel.play(0  , 18)
+            pyxel.play(2  , 47)
         case PlayEatingSound():
-            pyxel.play(0  ,31)
+            pyxel.play(1  ,31)
     return []
 
 
 def define_sounds():
+    # Main theme music
+    pyxel.sounds[0].pcm(str(_PROJECT_ROOT / "assets/audio/00_soundtrack_main.wav"))
+    # Boss theme music
+    pyxel.sounds[1].pcm(str(_PROJECT_ROOT / "assets/audio/01_soundtrack_boss_fight.wav"))
     # Soft footstep sound
     pyxel.sounds[16].pcm(str(_PROJECT_ROOT / "assets/audio/16_steps.ogg"))
     # Thought bubble chime — gentle ascending two-note
     pyxel.sounds[17].pcm(str(_PROJECT_ROOT / "assets/audio/17_water_bubble.ogg"))
     # Eating sound
     pyxel.sounds[31].pcm(str(_PROJECT_ROOT / "assets/audio/31_bite.ogg"))
+    # Thought bubble sound
+    pyxel.sounds[47].pcm(str(_PROJECT_ROOT / "assets/audio/47_thought_bubble.ogg"))
 
 
 class App:

@@ -55,7 +55,7 @@ from .messages import (
     RewindTick,
     SetSprinting,
 )
-from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound
+from .commands import *
 from .thoughts import check_triggers, get_memory
 
 
@@ -231,7 +231,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     thought=None,
                     thought_cooldown=THOUGHT_INITIAL_DELAY,
                 ),
-            ), []
+            ), [PlayMainThemeMusic()]
 
         case TypeChar(char=c):
             if game.state == "title" and len(game.seed_input) < 16:

@@ -10,6 +10,7 @@ class Cmd:
 class GenerateMap(Cmd):
     seed: int
 
+# SOUNDS --------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class PlayStepSound(Cmd):
@@ -27,4 +28,12 @@ class PlayThoughtSound(Cmd):
 
 @dataclass(frozen=True)
 class PlayEatingSound(Cmd):
+    pass
+
+@dataclass(frozen=True)
+class PlayMainThemeMusic(Cmd):
+    pass
+
+@dataclass(frozen=True)
+class PlayBossThemeMusic(Cmd):
     pass
