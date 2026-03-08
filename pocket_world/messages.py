@@ -120,3 +120,8 @@ class DarkWorldGenerated(Msg):
 @dataclass(frozen=True)
 class DismissCredits(Msg):
     pass
+
+
+@dataclass(frozen=True)
+class ChooseWizardOption(Msg):
+    option: int  # 1 or 2

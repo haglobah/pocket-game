@@ -25,11 +25,19 @@ from .messages import (
     Punch,
     DarkWorldGenerated,
     DismissCredits,
+    ChooseWizardOption,
 )
+from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound
 from .commands import (
-    Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound,
-    GenerateDarkWorld, PlayPunchSound, PlayHitSound, PlayBossFireSound, PlayVictorySound,
-    PlayMainThemeMusic, PlayBossThemeMusic, PlayTitleThemeMusic, PlayDeathScreenMusic,
+    GenerateDarkWorld,
+    PlayBossFireSound,
+    PlayBossThemeMusic,
+    PlayDeathScreenMusic,
+    PlayHitSound,
+    PlayMainThemeMusic,
+    PlayPunchSound,
+    PlayTitleThemeMusic,
+    PlayVictorySound,
 )
 from .mapgen import generate_map, generate_dark_world
 from .update import update
@@ -149,7 +157,12 @@ class App:
             display_scale=1,
         )
         pyxel.images[0].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "karl_sprites.png"))
-        pyxel.images[1].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "also_without_berries.png"))
+        pyxel.images[1].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "environment_sprites.png"))
+        # Bank 2 is used for the minimap in y=0..124; keep wise-man sprites below that.
+        pyxel.images[2].load(0, 128, str(_PROJECT_ROOT / "assets" / "sprites" / "wise-man-front.png"))
+        pyxel.images[2].load(16, 128, str(_PROJECT_ROOT / "assets" / "sprites" / "wise-man-left.png"))
+        pyxel.images[2].load(32, 128, str(_PROJECT_ROOT / "assets" / "sprites" / "wise-man-right.png"))
+        # Preload dark sprites used by dark pocket world encounters.
         _load_dark_sprites()
         define_sounds()
         self.model, cmds = init()
@@ -199,6 +212,10 @@ class App:
                 msgs.append(Eat())
             if pyxel.btnp(pyxel.KEY_M):
                 msgs.append(ToggleMinimap())
+            if pyxel.btnp(pyxel.KEY_1):
+                msgs.append(ChooseWizardOption(option=1))
+            if pyxel.btnp(pyxel.KEY_2):
+                msgs.append(ChooseWizardOption(option=2))
             msgs.append(SetSprinting(active=pyxel.btn(pyxel.KEY_C)))
 
         elif self.model.game.state == "dark_play":

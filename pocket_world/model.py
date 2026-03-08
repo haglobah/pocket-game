@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from pocket_world.commands import PlayTitleThemeMusic
 from .constants import (
@@ -21,6 +21,22 @@ class ThoughtBubble:
     text: str
     timer: int
     duration: int
+
+
+@dataclass(frozen=True)
+class NpcDialogueBubble:
+    text: str
+    timer: int
+    duration: int
+
+
+@dataclass(frozen=True)
+class WizardShot:
+    x: float
+    y: float
+    vx: float
+    vy: float
+    ttl: int
 
 
 @dataclass(frozen=True)
@@ -50,8 +66,11 @@ class PlantObject:
 class Map:
     tilemap: tuple[tuple[int, ...], ...]
     seed: int
+    spawn: Point
+    wise_man: Point
     objects: tuple[PlantObject, ...]
     poison_water: frozenset
+    _anchor_set: frozenset = field(init=False, repr=False)
 
     def __post_init__(self):
         object.__setattr__(self, '_anchor_set', frozenset(obj.anchor for obj in self.objects))
@@ -75,8 +94,17 @@ class Game:
     seed_input: str
     frame: int
     thought: ThoughtBubble | None
+    wise_dialogue: NpcDialogueBubble | None
+    wise_options: tuple[str, str] | None
+    wise_dialogue_active: bool
+    wise_dialogue_node: str
+    wise_outcome: str  # "none" | "attack" | "follow"
     seen_memories: tuple[str, ...]
     thought_cooldown: int
+    wise_dialogue_cooldown: int
+    wise_dialogue_index: int
+    wizard_shots: tuple[WizardShot, ...]
+    wizard_attack_cooldown: int
     show_minimap: bool
 
 
@@ -146,6 +174,8 @@ def init() -> tuple[Model, list]:
         map=Map(
             tilemap=(),
             seed=0,
+            spawn=Point(MAP_W // 2, MAP_H // 2),
+            wise_man=Point(MAP_W // 2 + 1, MAP_H // 2),
             objects=(),
             poison_water=frozenset(),
         ),
@@ -161,8 +191,17 @@ def init() -> tuple[Model, list]:
             seed_input="",
             frame=0,
             thought=None,
+            wise_dialogue=None,
+            wise_options=None,
+            wise_dialogue_active=False,
+            wise_dialogue_node="",
+            wise_outcome="none",
             seen_memories=(),
             thought_cooldown=0,
+            wise_dialogue_cooldown=0,
+            wise_dialogue_index=0,
+            wizard_shots=(),
+            wizard_attack_cooldown=0,
             show_minimap=False,
         ),
     )
