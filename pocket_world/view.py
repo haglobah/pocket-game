@@ -555,9 +555,10 @@ def view_play(model: Model):
         _draw_thought_bubble(player_cx, player_top - 6, model.game.thought)
 
     # Status bars
-    bar_w = 100
-    bar_h = 6
-    bar_x = 10
+    hud_font = _get_hud_font()
+    bar_w = 140
+    bar_h = 12
+    bar_x = (SCREEN_W - bar_w) // 2
     bar_y = 10
 
     def _draw_bar(
@@ -566,18 +567,13 @@ def view_play(model: Model):
         col = full_col if frac > 0.5 else (mid_col if frac > 0.25 else low_col)
         pyxel.rect(bar_x - 1, y - 1, bar_w + 2, bar_h + 2, 0)
         pyxel.rect(bar_x, y, int(bar_w * frac), bar_h, col)
-        pyxel.text(bar_x + bar_w + 4, y, label, 7)
+        pyxel.text(bar_x + bar_w + 4, y, label, 7, hud_font)
 
     # O2 bar (hidden when lungs on land and full)
     underwater = is_swimmable(model.map.tilemap[py][px])
     can_auto_breathe = model.player.breathing_mode == LUNGS and not underwater
     show_o2 = not (can_auto_breathe and model.player.o2 >= O2_MAX)
     if show_o2:
-        hud_font = _get_hud_font()
-        bar_w = 140
-        bar_h = 12
-        bar_x = (SCREEN_W - bar_w) // 2
-        bar_y = 10
         o2_frac = model.player.o2 / O2_MAX
         # Background
         pyxel.rect(bar_x - 1, bar_y - 1, bar_w + 2, bar_h + 2, 0)
@@ -586,7 +582,6 @@ def view_play(model: Model):
         pyxel.rect(bar_x, bar_y, int(bar_w * o2_frac), bar_h, fill_color)
         # Label
         mode_label = "LUNGS" if model.player.breathing_mode == LUNGS else "GILLS"
-        pyxel.text(bar_x + bar_w + 8, bar_y - 1, f"O2 [{mode_label}]", 7, hud_font)
         _draw_bar(bar_y, model.player.o2 / O2_MAX, f"O2 [{mode_label}]", 11, 9, 8)
         bar_y += bar_h + 4
 
