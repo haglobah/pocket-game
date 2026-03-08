@@ -1,11 +1,14 @@
 from dataclasses import replace
 
+import math
+
 from .constants import (
     MAP_W,
     MAP_H,
     Point,
     WATER,
     WATER_DEEP,
+    PORTAL,
     is_swimmable,
     O2_MAX,
     O2_BREATHE_REFILL,
@@ -33,10 +36,19 @@ from .constants import (
     HUNGER_DEPLETION,
     FOOD_TILES,
     DRINK_TILES,
+    PLAYER_MAX_HP,
+    PUNCH_RANGE,
+    PUNCH_COOLDOWN,
+    INVINCIBLE_FRAMES,
+    BOSS_FIRE_INTERVAL,
+    PROJECTILE_SPEED,
+    PROJECTILE_MOVE_INTERVAL,
     is_walkable,
-    is_swimmable,
 )
-from .model import Model, Map, ThoughtBubble
+from .model import (
+    Model, Map, ThoughtBubble,
+    BossPart, Boss, Projectile, Minion, DarkWorld,
+)
 from .messages import (
     Msg,
     Tick,
@@ -54,8 +66,18 @@ from .messages import (
     DismissDeathScreen,
     RewindTick,
     SetSprinting,
+    EnterDarkWorld,
+    Punch,
+    PlayerHit,
+    BossPartDestroyed,
+    BossDefeated,
+    DarkWorldGenerated,
+    DismissCredits,
 )
-from .commands import Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound
+from .commands import (
+    Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound,
+    GenerateDarkWorld, PlayPunchSound, PlayHitSound, PlayBossFireSound, PlayVictorySound,
+)
 from .thoughts import check_triggers, get_memory
 
 
@@ -106,6 +128,8 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
 
     match msg:
         case Tick():
+            if game.state == "dark_play":
+                return _dark_tick(model)
             if game.state == "dead":
                 return replace(model,
                     cycle=replace(cycle, death_timer=cycle.death_timer + 1),
@@ -197,20 +221,27 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             ), cmds
 
         case MoveDir(direction=d):
+            if game.state == "dark_play":
+                return _dark_move(model, d)
             if game.state != "play":
                 return model, []
             if player.move_timer > 0:
                 return replace(model, player=replace(player, facing=d)), []
             raw = Point(player.pos.x + d.x, player.pos.y + d.y)
             new_pos = Point(raw.x % MAP_W, raw.y % MAP_H)
-            if is_walkable(map_.tilemap[new_pos.y][new_pos.x]):
+            tile = map_.tilemap[new_pos.y][new_pos.x]
+            if tile == PORTAL:
+                return replace(model,
+                    player=replace(player, pos=new_pos, facing=d, move_timer=MOVE_DELAY_LAND),
+                ), [GenerateDarkWorld(seed=map_.seed, tilemap=map_.tilemap)]
+            if is_walkable(tile):
                 delay = MOVE_DELAY_RUNNING if player.sprinting else MOVE_DELAY_LAND
                 skill = "sprinting" if player.sprinting else "walking on land"
                 return replace(model,
                     player=replace(player, pos=new_pos, facing=d, move_timer=delay),
                     cycle=replace(cycle, learned=_add_learned(cycle, skill)),
                 ), [PlayStepSound()]
-            if is_swimmable(map_.tilemap[new_pos.y][new_pos.x]):
+            if is_swimmable(tile):
                 return replace(model,
                     player=replace(player, pos=new_pos, facing=d, move_timer=MOVE_DELAY_WATER),
                     cycle=replace(cycle, learned=_add_learned(cycle, "swimming")),
@@ -325,4 +356,228 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 ), []
             return model, []
 
+        case DarkWorldGenerated(boss_parts=bp, minions=mn):
+            parts = tuple(
+                BossPart(name=name, hp=hp, max_hp=mhp, pos=pos, size=size)
+                for name, hp, mhp, pos, size in bp
+            )
+            minions = tuple(
+                Minion(kind=kind, pos=pos, hp=hp, facing=DOWN, move_timer=md)
+                for kind, pos, hp, md in mn
+            )
+            dark = DarkWorld(
+                boss=Boss(parts=parts, fire_timer=BOSS_FIRE_INTERVAL, phase="active"),
+                minions=minions,
+                projectiles=(),
+                arena_tiles=model.map.tilemap,
+            )
+            return replace(model,
+                player=replace(player, hp=PLAYER_MAX_HP, invincible_timer=0, punch_timer=0),
+                dark_world=dark,
+                game=replace(game, state="dark_play"),
+            ), []
+
+        case Punch():
+            if game.state != "dark_play" or model.dark_world is None:
+                return model, []
+            if player.punch_timer > 0:
+                return model, []
+            dw = model.dark_world
+            cmds: list[Cmd] = [PlayPunchSound()]
+            new_parts = list(dw.boss.parts)
+            for i, part in enumerate(new_parts):
+                if part.hp <= 0:
+                    continue
+                if _punch_hits_rect(player.pos, player.facing, part.pos, part.size):
+                    new_hp = part.hp - 1
+                    new_parts[i] = replace(part, hp=new_hp)
+            new_minions = list(dw.minions)
+            for i, m in enumerate(new_minions):
+                if m.hp <= 0:
+                    continue
+                if _punch_hits_point(player.pos, player.facing, m.pos):
+                    new_minions[i] = replace(m, hp=m.hp - 1)
+            alive_parts = [p for p in new_parts if p.hp > 0]
+            alive_minions = tuple(m for m in new_minions if m.hp > 0)
+            new_boss = replace(dw.boss, parts=tuple(new_parts))
+            if not alive_parts:
+                new_boss = replace(new_boss, phase="defeated")
+                return replace(model,
+                    player=replace(player, punch_timer=PUNCH_COOLDOWN),
+                    dark_world=replace(dw, boss=new_boss, minions=alive_minions),
+                    game=replace(game, state="ending_b"),
+                ), cmds + [PlayVictorySound()]
+            return replace(model,
+                player=replace(player, punch_timer=PUNCH_COOLDOWN),
+                dark_world=replace(dw, boss=new_boss, minions=alive_minions),
+            ), cmds
+
+        case BossDefeated():
+            return replace(model, game=replace(game, state="ending_b")), [PlayVictorySound()]
+
+        case DismissCredits():
+            from .model import init as model_init
+            return model_init()
+
     return model, []
+
+
+# ---------------------------------------------------------------------------
+# Dark Pocket World helpers
+# ---------------------------------------------------------------------------
+
+def _dark_move(model: Model, d: Point) -> tuple[Model, list[Cmd]]:
+    """Handle movement inside the dark world (same map, dark sprites)."""
+    player = model.player
+    if player.move_timer > 0:
+        return replace(model, player=replace(player, facing=d)), []
+    raw = Point(player.pos.x + d.x, player.pos.y + d.y)
+    if raw.x < 0 or raw.x >= MAP_W or raw.y < 0 or raw.y >= MAP_H:
+        return replace(model, player=replace(player, facing=d)), []
+    if not is_walkable(model.map.tilemap[raw.y][raw.x]):
+        return replace(model, player=replace(player, facing=d)), []
+    delay = MOVE_DELAY_RUNNING if player.sprinting else MOVE_DELAY_LAND
+    return replace(model,
+        player=replace(player, pos=raw, facing=d, move_timer=delay),
+    ), [PlayStepSound()]
+
+
+def _dark_tick(model: Model) -> tuple[Model, list[Cmd]]:
+    """Per-frame update for the dark_play state."""
+    player = model.player
+    dw = model.dark_world
+    game = model.game
+    if dw is None:
+        return model, []
+
+    cmds: list[Cmd] = []
+
+    new_invincible = max(0, player.invincible_timer - 1)
+    new_punch_timer = max(0, player.punch_timer - 1)
+    new_move_timer = max(0, player.move_timer - 1)
+    new_hp = player.hp
+
+    # --- Boss AI: fire projectiles from all alive parts ---
+    boss = dw.boss
+    new_fire_timer = boss.fire_timer - 1
+    new_projectiles = list(dw.projectiles)
+    new_tick = dw.tick + 1
+
+    if new_fire_timer <= 0 and boss.phase == "active":
+        head = next((p for p in boss.parts if p.name == "head" and p.hp > 0), None)
+        if head:
+            src = Point(head.pos.x + head.size.x // 2,
+                        head.pos.y + head.size.y // 2)
+            dx = player.pos.x - src.x
+            dy = player.pos.y - src.y
+            dist = max(1, math.sqrt(dx * dx + dy * dy))
+            vx = round(dx / dist * PROJECTILE_SPEED)
+            vy = round(dy / dist * PROJECTILE_SPEED)
+            if vx == 0 and vy == 0:
+                vy = PROJECTILE_SPEED
+            new_projectiles.append(Projectile(pos=src, velocity=Point(vx, vy)))
+            cmds.append(PlayBossFireSound())
+        new_fire_timer = BOSS_FIRE_INTERVAL
+
+    # --- Update projectiles (only move every PROJECTILE_MOVE_INTERVAL frames) ---
+    updated_projectiles = []
+    should_move = (new_tick % PROJECTILE_MOVE_INTERVAL == 0)
+    for proj in new_projectiles:
+        if should_move:
+            np_ = Point(proj.pos.x + proj.velocity.x, proj.pos.y + proj.velocity.y)
+            if np_.x < 0 or np_.x >= MAP_W or np_.y < 0 or np_.y >= MAP_H:
+                continue
+            if abs(np_.x - player.pos.x) <= 1 and abs(np_.y - player.pos.y) <= 1:
+                if new_invincible == 0:
+                    new_hp -= 1
+                    new_invincible = INVINCIBLE_FRAMES
+                    cmds.append(PlayHitSound())
+                continue
+            updated_projectiles.append(replace(proj, pos=np_))
+        else:
+            if abs(proj.pos.x - player.pos.x) <= 1 and abs(proj.pos.y - player.pos.y) <= 1:
+                if new_invincible == 0:
+                    new_hp -= 1
+                    new_invincible = INVINCIBLE_FRAMES
+                    cmds.append(PlayHitSound())
+                continue
+            updated_projectiles.append(proj)
+
+    # --- Minion AI ---
+    new_minions = []
+    for m in dw.minions:
+        if m.hp <= 0:
+            continue
+        mt = m.move_timer - 1
+        if mt <= 0:
+            dx = player.pos.x - m.pos.x
+            dy = player.pos.y - m.pos.y
+            sx = 1 if dx > 0 else (-1 if dx < 0 else 0)
+            sy = 1 if dy > 0 else (-1 if dy < 0 else 0)
+            new_mpos = Point(m.pos.x + sx, m.pos.y + sy)
+            if (new_mpos.x < 0 or new_mpos.x >= MAP_W or
+                    new_mpos.y < 0 or new_mpos.y >= MAP_H or
+                    not is_walkable(model.map.tilemap[new_mpos.y][new_mpos.x])):
+                new_mpos = m.pos
+            new_facing = Point(sx if sx != 0 else m.facing.x, sy if sy != 0 else m.facing.y)
+            mt = _minion_delay(m.kind)
+            new_minions.append(replace(m, pos=new_mpos, facing=new_facing, move_timer=mt))
+            if abs(new_mpos.x - player.pos.x) <= 1 and abs(new_mpos.y - player.pos.y) <= 1:
+                if new_invincible == 0:
+                    new_hp -= 1
+                    new_invincible = INVINCIBLE_FRAMES
+                    cmds.append(PlayHitSound())
+        else:
+            new_minions.append(replace(m, move_timer=mt))
+
+    # --- Check death ---
+    if new_hp <= 0:
+        return replace(model,
+            player=replace(player, hp=0),
+            cycle=replace(model.cycle, death_reason="Defeated in the Dark Pocket World", death_timer=0),
+            game=replace(game, state="dead", frame=game.frame + 1),
+        ), cmds
+
+    new_boss = replace(boss, fire_timer=new_fire_timer)
+    new_dw = replace(dw,
+        boss=new_boss,
+        minions=tuple(new_minions),
+        projectiles=tuple(updated_projectiles),
+        tick=new_tick,
+    )
+    return replace(model,
+        player=replace(player,
+            hp=new_hp,
+            invincible_timer=new_invincible,
+            punch_timer=new_punch_timer,
+            move_timer=new_move_timer,
+        ),
+        dark_world=new_dw,
+        game=replace(game, frame=game.frame + 1),
+    ), cmds
+
+
+def _minion_delay(kind: str) -> int:
+    delays = {"squid": 45, "squid_small": 35, "scorpion": 55, "golem": 70}
+    return delays.get(kind, 45)
+
+
+def _punch_hits_rect(player_pos: Point, facing: Point, rect_pos: Point, rect_size: Point) -> bool:
+    """Check if punch in facing direction hits a rectangular area."""
+    for i in range(1, PUNCH_RANGE + 1):
+        px = player_pos.x + facing.x * i
+        py = player_pos.y + facing.y * i
+        if (rect_pos.x <= px < rect_pos.x + rect_size.x and
+                rect_pos.y <= py < rect_pos.y + rect_size.y):
+            return True
+    return False
+
+
+def _punch_hits_point(player_pos: Point, facing: Point, target: Point) -> bool:
+    """Check if punch in facing direction hits a single-tile target."""
+    for i in range(1, PUNCH_RANGE + 1):
+        px = player_pos.x + facing.x * i
+        py = player_pos.y + facing.y * i
+        if abs(px - target.x) <= 1 and abs(py - target.y) <= 1:
+            return True
+    return False

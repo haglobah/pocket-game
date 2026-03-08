@@ -16,6 +16,11 @@ from .constants import (
     BUSH_GREEN,
     BUSH_FLOWERING,
     BUSH_BERRY,
+    PORTAL,
+    BOSS_PARTS,
+    MINION_CONFIGS,
+    Point,
+    is_walkable,
 )
 
 
@@ -138,6 +143,9 @@ def generate_map(seed: int) -> tuple[tuple[int, ...], ...]:
     )
     tiles = np.where((dist_from_center < 75) & plant_tiles, SAND, tiles)
 
+    # Place portal 150–250 tiles from center on a walkable tile
+    _place_portal(tiles, seed)
+
     # Convert to tuple[tuple[int, ...], ...]
     return tuple(tuple(int(v) for v in row) for row in tiles)
 
@@ -226,3 +234,45 @@ def _place_oases(
                     elif h < 25:
                         bush_h = h % 3
                         tiles[ty, tx] = [BUSH_GREEN, BUSH_FLOWERING, BUSH_BERRY][bush_h]
+
+
+def _place_portal(tiles: np.ndarray, seed: int) -> None:
+    """Place a PORTAL tile near spawn for easy testing."""
+    cx, cy = MAP_W // 2, MAP_H // 2
+    # Place 3 tiles to the right of center spawn
+    for dx in range(3, 20):
+        tx = cx + dx
+        if 0 <= tx < MAP_W and is_walkable(tiles[cy, tx]):
+            tiles[cy, tx] = PORTAL
+            return
+
+
+def generate_dark_world(seed: int, tilemap: tuple) -> tuple[tuple, tuple]:
+    """Position boss parts and spawn minions on the normal map for the dark world.
+
+    Returns (boss_parts_data, minions_data).
+    """
+    rng = np.random.RandomState(seed + 77777)
+
+    # Boss positioned at center-north of map
+    boss_cx = MAP_W // 2
+    boss_cy = MAP_H // 2 - 20
+    boss_parts_data = tuple(
+        (name, cfg["hp"], cfg["hp"],
+         Point(boss_cx + cfg["x"], boss_cy + cfg["y"]),
+         Point(cfg["w"], cfg["h"]))
+        for name, cfg in BOSS_PARTS.items()
+    )
+
+    # Spawn minions on walkable tiles around the boss area
+    minions_data = []
+    for kind, hp, move_delay, count in MINION_CONFIGS:
+        for _ in range(count):
+            for _attempt in range(200):
+                mx = rng.randint(max(1, boss_cx - 40), min(MAP_W - 1, boss_cx + 40))
+                my = rng.randint(boss_cy, min(MAP_H - 1, boss_cy + 50))
+                if is_walkable(tilemap[my][mx]):
+                    break
+            minions_data.append((kind, Point(int(mx), int(my)), hp, move_delay))
+
+    return boss_parts_data, tuple(minions_data)

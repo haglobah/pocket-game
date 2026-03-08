@@ -1,3 +1,5 @@
+import math
+
 import pyxel
 from pathlib import Path
 
@@ -12,6 +14,10 @@ from .constants import (
     MAP_H,
     WATER,
     WATER_DEEP,
+    PORTAL,
+    PLAYER_MAX_HP,
+    PUNCH_COOLDOWN,
+    DARK_SPRITE_MAP,
     is_swimmable,
     SAND,
     SAND_DARK,
@@ -118,16 +124,17 @@ _MINIMAP_COLORS = {
     BUSH_GREEN: 3,
     BUSH_FLOWERING: 14,
     BUSH_BERRY: 8,
+    PORTAL: 2,
 }
 
 # Cache the seed for which image bank 2 has been written
 _minimap_cache_seed: int | None = None
 
 
-def draw_tile(sx: int, sy: int, tile: int, frame: int):
+def draw_tile(sx: int, sy: int, tile: int, frame: int, bank: int = 1):
     """Draw a 32x32 desert tile at screen pixel position (sx, sy)."""
     if tile == SAND:
-        pyxel.blt(sx, sy, 1, 0, 32, 32, 32)
+        pyxel.blt(sx, sy, bank, 0, 32, 32, 32)
         # # Light sand base
         # pyxel.rect(sx, sy, 32, 32, 10)
         # # Subtle dot pattern for texture
@@ -137,7 +144,7 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
         #     pyxel.pset(sx + dx, sy + dy, 9)
     elif tile == SAND_DARK:
         # Darker sand with ripple texture
-        pyxel.blt(sx, sy, 1, 96, 0, 32, 32)
+        pyxel.blt(sx, sy, bank, 96, 0, 32, 32)
         # pyxel.rect(sx, sy, 32, 32, 9)
         # for i in range(4):
         #     dx = ((sx + i * 17) * 3 + sy) % 26 + 3
@@ -166,7 +173,7 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
             dx = ((sx + i * 11) % 28) + 2
             pyxel.pset(sx + dx, sy + 12, 4)
     elif tile == PALM_TREE:
-        pyxel.blt(sx, sy, 1, 96, 32, 32, 32)
+        pyxel.blt(sx, sy, bank, 96, 32, 32, 32)
         # # Sand base
         # pyxel.rect(sx, sy, 32, 32, 10)
         # # Trunk
@@ -181,7 +188,7 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
         # pyxel.circ(sx + 13, sy + 11, 2, 4)
         # pyxel.circ(sx + 19, sy + 11, 2, 9)
     elif tile == CACTUS:
-        pyxel.blt(sx, sy, 1, 64, 32, 32, 32)
+        pyxel.blt(sx, sy, bank, 64, 32, 32, 32)
         # # Sand base
         # pyxel.rect(sx, sy, 32, 32, 10)
         # # Main cactus body
@@ -214,7 +221,7 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
         pyxel.circ(sx + 14, sy + 20, 6, 7)
         pyxel.circ(sx + 18, sy + 24, 5, 5)
     elif tile == WATER:
-        pyxel.blt(sx, sy, 1, 0, 96, 32, 32)
+        pyxel.blt(sx, sy, bank, 0, 96, 32, 32)
         # Shallow oasis water — light blue with wave lines
         # water_frame = (frame // 80) % 4
         # c1, c2 = 5, 12
@@ -225,7 +232,7 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
         #     wy = sy + 6 + i * 10 + (water_frame * 3) % 8
         #     pyxel.line(sx + 4, wy, sx + 28, wy, c2)
     elif tile == WATER_DEEP:
-        pyxel.blt(sx, sy, 1, 0, 64, 32, 32)
+        pyxel.blt(sx, sy, bank, 0, 64, 32, 32)
         # # Deep oasis water — darker blue/indigo
         # water_frame = (frame // 100) % 4
         # c1, c2 = 1, 5
@@ -258,19 +265,22 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
         pyxel.pset(sx + 10, sy + 15, 7)
         pyxel.pset(sx + 18, sy + 13, 7)
     elif tile == BUSH_BERRY:
-        pyxel.blt(sx, sy, 1, 32, 32, 32, 32)
-        # # Berry bush — green with red/purple berries
-        # pyxel.rect(sx, sy, 32, 32, 10)
-        # # Bush body
-        # pyxel.circ(sx + 16, sy + 20, 9, 11)
-        # pyxel.circ(sx + 12, sy + 17, 7, 3)
-        # pyxel.circ(sx + 20, sy + 18, 6, 11)
-        # # Berries
-        # pyxel.circ(sx + 10, sy + 16, 2, 8)
-        # pyxel.circ(sx + 15, sy + 14, 2, 2)
-        # pyxel.circ(sx + 21, sy + 15, 2, 8)
-        # pyxel.circ(sx + 13, sy + 20, 2, 2)
-        # pyxel.circ(sx + 19, sy + 21, 2, 8)
+        pyxel.blt(sx, sy, bank, 32, 32, 32, 32)
+    elif tile == PORTAL:
+        pyxel.rect(sx, sy, 32, 32, 0)
+        anim = (frame // 8) % 5
+        r_outer = 14
+        r_inner = 8
+        cx, cy = sx + 16, sy + 16
+        portal_colors = (2, 5, 12, 6, 13)
+        pyxel.circ(cx, cy, r_outer, portal_colors[anim])
+        pyxel.circ(cx, cy, r_inner, portal_colors[(anim + 2) % 5])
+        pyxel.circ(cx, cy, 4, 0)
+        for i in range(6):
+            angle = (frame * 0.05 + i * 1.047)
+            lx = cx + int(math.cos(angle) * r_outer)
+            ly = cy + int(math.sin(angle) * r_outer)
+            pyxel.pset(lx, ly, 7)
 
 
 def draw_character(sx: int, sy: int, facing, frame: int):
@@ -297,6 +307,10 @@ def view(model: Model):
         view_death(model)
     elif model.game.state == "rewind":
         view_rewind(model)
+    elif model.game.state == "dark_play":
+        view_dark_play(model)
+    elif model.game.state == "ending_b":
+        view_ending_b(model)
     else:
         view_play(model)
 
@@ -642,3 +656,156 @@ def view_play(model: Model):
     for line in lines:
         pyxel.text(2, y, line, 7)
         y += pyxel.FONT_HEIGHT + 2
+
+
+# ---------------------------------------------------------------------------
+# Dark Pocket World view
+# ---------------------------------------------------------------------------
+
+_BOSS_SPRITE_KEYS = {
+    "head": "head",
+    "wings": "wings",
+    "arms_left": "arms",
+    "arms_right": "arms",
+}
+
+
+def _blt_dark_sprite(sx: int, sy: int, key: str, w: int, h: int):
+    """Draw a sprite using DARK_SPRITE_MAP, with transparency color 0."""
+    info = DARK_SPRITE_MAP.get(key)
+    if info:
+        bank, u, v, sw, sh = info
+        pyxel.blt(sx, sy, bank, u, v, w, h, 0)
+
+
+def view_dark_play(model: Model):
+    global _minimap_cache_seed
+    _minimap_cache_seed = None  # bank 2 is now used for dark sprites
+    pyxel.cls(0)
+    dw = model.dark_world
+    if dw is None:
+        return
+
+    px, py = model.player.pos
+    cam_x = px - VIEWPORT_W // 2
+    cam_y = py - VIEWPORT_H // 2
+
+    # Draw normal map tiles using dark sprites (bank 2 instead of bank 1)
+    tilemap = model.map.tilemap
+    for sy in range(VIEWPORT_H):
+        for sx in range(VIEWPORT_W):
+            tx = cam_x + sx
+            ty = cam_y + sy
+            if tx < 0 or tx >= MAP_W or ty < 0 or ty >= MAP_H:
+                pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 0)
+                continue
+            tile = tilemap[ty][tx]
+            draw_tile(sx * TILE_SIZE, sy * TILE_SIZE, tile, model.game.frame, bank=2)
+
+    # Draw boss parts with layering: back → front
+    _BOSS_Z_ORDER = ("wings", "arms_left", "arms_right", "head")
+    parts_by_name = {p.name: p for p in dw.boss.parts}
+    frame = model.game.frame
+    arm_sway = int(math.sin(frame * 0.03) * 4)
+    for name in _BOSS_Z_ORDER:
+        part = parts_by_name.get(name)
+        if part is None or part.hp <= 0:
+            continue
+        bx = (part.pos.x - cam_x) * TILE_SIZE
+        by = (part.pos.y - cam_y) * TILE_SIZE
+        bw = part.size.x * TILE_SIZE
+        bh = part.size.y * TILE_SIZE
+        if name == "arms_left":
+            bx -= arm_sway
+        elif name == "arms_right":
+            bx += arm_sway
+        if name == "wings":
+            bank, su, sv, sw, sh = DARK_SPRITE_MAP["wings"]
+            half_w = sw // 2
+            pyxel.blt(bx, by, bank, su, sv, half_w, sh, 0)
+            pyxel.blt(bx + bw - half_w, by, bank, su + half_w, sv, half_w, sh, 0)
+        else:
+            sprite_key = _BOSS_SPRITE_KEYS.get(part.name)
+            if sprite_key and sprite_key in DARK_SPRITE_MAP:
+                bank, su, sv, sw, sh = DARK_SPRITE_MAP[sprite_key]
+                draw_w = -sw if part.name == "arms_right" else sw
+                pyxel.blt(bx, by, bank, su, sv, draw_w, sh, 0)
+
+    # Draw projectiles
+    for proj in dw.projectiles:
+        proj_sx = (proj.pos.x - cam_x) * TILE_SIZE
+        proj_sy = (proj.pos.y - cam_y) * TILE_SIZE
+        pkey = "projectile_1" if (model.game.frame // 6) % 2 == 0 else "projectile_2"
+        bank, su, sv, sw, sh = DARK_SPRITE_MAP[pkey]
+        pyxel.blt(proj_sx, proj_sy, bank, su, sv, sw, sh, 0)
+
+    # Draw minions
+    for m in dw.minions:
+        if m.hp <= 0:
+            continue
+        mx = (m.pos.x - cam_x) * TILE_SIZE
+        my = (m.pos.y - cam_y) * TILE_SIZE
+        if m.kind in DARK_SPRITE_MAP:
+            bank, su, sv, sw, sh = DARK_SPRITE_MAP[m.kind]
+            draw_w = -sw if m.facing.x >= 0 else sw
+            pyxel.blt(mx, my, bank, su, sv, draw_w, sh, 0)
+
+    # Draw player
+    pcx = (VIEWPORT_W // 2) * TILE_SIZE
+    pcy = (VIEWPORT_H // 2) * TILE_SIZE
+    if model.player.invincible_timer > 0 and (model.game.frame // 4) % 2 == 0:
+        pass  # blink — don't draw
+    else:
+        draw_character(pcx, pcy, model.player.facing, model.game.frame)
+
+    # Punch visual
+    if model.player.punch_timer > PUNCH_COOLDOWN - 4:
+        f = model.player.facing
+        for i in range(1, 3):
+            flash_x = pcx + f.x * i * TILE_SIZE + TILE_SIZE // 2
+            flash_y = pcy + f.y * i * TILE_SIZE + TILE_SIZE // 2
+            pyxel.circ(flash_x, flash_y, 6, 10)
+            pyxel.circ(flash_x, flash_y, 3, 7)
+
+    # HUD: Player HP
+    hud_y = 6
+    hud_font = _get_hud_font()
+    for i in range(PLAYER_MAX_HP):
+        hx = 8 + i * 18
+        col = 8 if i < model.player.hp else 1
+        pyxel.rect(hx, hud_y, 14, 14, col)
+        pyxel.rectb(hx, hud_y, 14, 14, 7)
+
+    # Boss status
+    alive_count = sum(1 for p in dw.boss.parts if p.hp > 0)
+    total_count = len(dw.boss.parts)
+    status = f"Boss: {alive_count}/{total_count} parts"
+    if hud_font:
+        pyxel.text(SCREEN_W - hud_font.text_width(status) - 8, hud_y + 2, status, 7, hud_font)
+    else:
+        pyxel.text(SCREEN_W - len(status) * pyxel.FONT_WIDTH - 8, hud_y + 2, status, 7)
+
+    # Controls hint at bottom
+    map_bottom = VIEWPORT_H * TILE_SIZE
+    pyxel.rect(0, map_bottom, SCREEN_W, DEBUG_HEIGHT, 0)
+    pyxel.text(2, map_bottom + 2, f"HP:{model.player.hp}/{PLAYER_MAX_HP}  [F] Punch  [WASD/Arrows] Move", 7)
+    pyxel.text(2, map_bottom + 12, f"Boss parts alive: {alive_count}/{total_count}  Minions: {len([m for m in dw.minions if m.hp > 0])}", 7)
+
+
+def view_ending_b(model: Model):
+    pyxel.cls(0)
+    ui_font = _get_ui_font()
+    title_font = _get_title_font()
+
+    _center_text(140, "YOU SAVED THE", 7, title_font)
+    _center_text(190, "POCKET WORLD", 11, title_font)
+
+    _center_text(260, "The dark pocket world has been defeated.", 13, ui_font)
+    _center_text(290, "The stolen land returns to its rightful place.", 13, ui_font)
+    _center_text(320, "Peace is restored.", 7, ui_font)
+
+    _center_text(380, "-- ENDING B --", 14, ui_font)
+
+    blink = (model.game.frame // 30) % 2 == 0
+    if blink:
+        _center_text(430, "[ENTER] Return to Title", 7, ui_font)

@@ -25,6 +25,9 @@ WATER_DEEP = 9
 BUSH_GREEN = 10
 BUSH_FLOWERING = 11
 BUSH_BERRY = 12
+PORTAL = 13
+DARK_FLOOR = 14
+DARK_WALL = 15
 
 # Keep old names mapped for compatibility
 GRASS = SAND
@@ -36,7 +39,7 @@ BUSH = DEAD_BUSH
 
 
 def is_walkable(tile: int) -> bool:
-    return tile in (SAND, SAND_DARK, DEAD_BUSH, BUSH_GREEN, BUSH_FLOWERING, BUSH_BERRY)
+    return tile in (SAND, SAND_DARK, DEAD_BUSH, BUSH_GREEN, BUSH_FLOWERING, BUSH_BERRY, PORTAL, DARK_FLOOR)
 
 
 def is_swimmable(tile: int) -> bool:
@@ -95,6 +98,50 @@ UP_LEFT = Point(-1, -1)
 UP_RIGHT = Point(1, -1)
 DOWN_LEFT = Point(-1, 1)
 DOWN_RIGHT = Point(1, 1)
+
+# Dark Pocket World arena
+DARK_ARENA_W = 50
+DARK_ARENA_H = 50
+
+# Combat
+PLAYER_MAX_HP = 5
+PUNCH_RANGE = 2  # tiles in facing direction
+PUNCH_COOLDOWN = 20  # frames between punches
+INVINCIBLE_FRAMES = 60  # i-frames after taking a hit
+
+# Boss
+BOSS_FIRE_INTERVAL = 96  # frames between projectile volleys
+PROJECTILE_SPEED = 1  # tiles per movement tick
+PROJECTILE_MOVE_INTERVAL = 5  # only move projectiles every N frames (10x slower)
+
+BOSS_PARTS = {
+    "head": {"hp": 5, "x": 0, "y": 0, "w": 4, "h": 4},
+    "wings": {"hp": 3, "x": -3, "y": 1, "w": 10, "h": 4},
+    "arms_left": {"hp": 3, "x": -2, "y": 1, "w": 3, "h": 4},
+    "arms_right": {"hp": 3, "x": 3, "y": 1, "w": 3, "h": 4},
+}
+
+# Minion spawns: (kind, hp, move_delay, count)
+MINION_CONFIGS = (
+    ("squid", 2, 45, 2),
+    ("squid_small", 1, 35, 3),
+    ("scorpion", 3, 55, 2),
+    ("golem", 4, 70, 2),
+)
+
+# Sprite layout for dark world: (bank, x, y, w, h)
+# Only left-facing minions stored; right-facing uses horizontal flip
+DARK_SPRITE_MAP = {
+    "squid": (1, 0, 128, 64, 64),
+    "squid_small": (1, 64, 128, 64, 64),
+    "scorpion": (1, 0, 192, 64, 64),
+    "golem": (1, 64, 192, 64, 64),
+    "head": (1, 128, 0, 128, 128),
+    "wings": (2, 0, 128, 256, 128),
+    "arms": (1, 160, 128, 96, 128),
+    "projectile_1": (1, 128, 192, 32, 32),
+    "projectile_2": (1, 128, 224, 32, 32),
+}
 
 DIR_NAME = {
     UP: "UP",

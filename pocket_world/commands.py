@@ -28,3 +28,29 @@ class PlayThoughtSound(Cmd):
 @dataclass(frozen=True)
 class PlayEatingSound(Cmd):
     pass
+
+
+@dataclass(frozen=True)
+class GenerateDarkWorld(Cmd):
+    seed: int
+    tilemap: tuple
+
+
+@dataclass(frozen=True)
+class PlayPunchSound(Cmd):
+    pass
+
+
+@dataclass(frozen=True)
+class PlayHitSound(Cmd):
+    pass
+
+
+@dataclass(frozen=True)
+class PlayBossFireSound(Cmd):
+    pass
+
+
+@dataclass(frozen=True)
+class PlayVictorySound(Cmd):
+    pass

@@ -9,6 +9,7 @@ from .constants import (
     DOWN,
     HYDRATION_START,
     HUNGER_START,
+    PLAYER_MAX_HP,
 )
 
 
@@ -30,6 +31,9 @@ class Player:
     breathing_mode: str
     hydration: int
     hunger: int
+    hp: int = PLAYER_MAX_HP
+    invincible_timer: int = 0
+    punch_timer: int = 0
 
 
 @dataclass(frozen=True)
@@ -49,7 +53,7 @@ class Cycle:
 
 @dataclass(frozen=True)
 class Game:
-    state: str  # "title" | "play" | "dead" | "rewind"
+    state: str  # "title" | "play" | "dead" | "rewind" | "dark_play" | "ending_b"
     seed_input: str
     frame: int
     thought: ThoughtBubble | None
@@ -59,11 +63,53 @@ class Game:
 
 
 @dataclass(frozen=True)
+class BossPart:
+    name: str
+    hp: int
+    max_hp: int
+    pos: Point
+    size: Point
+
+
+@dataclass(frozen=True)
+class Boss:
+    parts: tuple[BossPart, ...]
+    fire_timer: int
+    phase: str  # "active" | "defeated"
+
+
+@dataclass(frozen=True)
+class Projectile:
+    pos: Point
+    velocity: Point
+    alive: bool = True
+
+
+@dataclass(frozen=True)
+class Minion:
+    kind: str
+    pos: Point
+    hp: int
+    facing: Point
+    move_timer: int
+
+
+@dataclass(frozen=True)
+class DarkWorld:
+    boss: Boss
+    minions: tuple[Minion, ...]
+    projectiles: tuple[Projectile, ...]
+    arena_tiles: tuple[tuple[int, ...], ...]
+    tick: int = 0
+
+
+@dataclass(frozen=True)
 class Model:
     player: Player
     map: Map
     cycle: Cycle
     game: Game
+    dark_world: DarkWorld | None = None
 
 
 def init() -> tuple[Model, list]:

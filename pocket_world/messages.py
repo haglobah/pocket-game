@@ -82,3 +82,39 @@ class RewindTick(Msg):
 @dataclass(frozen=True)
 class SetSprinting(Msg):
     active: bool
+
+
+@dataclass(frozen=True)
+class EnterDarkWorld(Msg):
+    pass
+
+
+@dataclass(frozen=True)
+class Punch(Msg):
+    pass
+
+
+@dataclass(frozen=True)
+class PlayerHit(Msg):
+    damage: int
+
+
+@dataclass(frozen=True)
+class BossPartDestroyed(Msg):
+    part_name: str
+
+
+@dataclass(frozen=True)
+class BossDefeated(Msg):
+    pass
+
+
+@dataclass(frozen=True)
+class DarkWorldGenerated(Msg):
+    boss_parts: tuple
+    minions: tuple
+
+
+@dataclass(frozen=True)
+class DismissCredits(Msg):
+    pass
