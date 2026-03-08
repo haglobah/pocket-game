@@ -106,23 +106,37 @@ def generate_map(seed: int) -> tuple[tuple[int, ...], ...]:
     # Classify tiles (start with SAND=0)
     tiles = np.zeros((MAP_H, MAP_W), dtype=np.int32)
 
-    # Elevation-based: cliff and cliff edge
-    tiles = np.where(elev > 0.62, CLIFF, tiles)
-    cliff_edge_mask = (elev > 0.58) & (elev <= 0.62)
+    # Elevation-based: cliff and cliff edge (raised threshold = less mountains)
+    tiles = np.where(elev > 0.70, CLIFF, tiles)
+    cliff_edge_mask = (elev > 0.66) & (elev <= 0.70)
     tiles = np.where(cliff_edge_mask, CLIFF_EDGE, tiles)
 
     # For non-cliff tiles, apply detail/scatter classification
-    flat = elev <= 0.58
-    tiles = np.where(flat & (detail > 0.65) & (scatter > 0.92), PALM_TREE, tiles)
+    flat = elev <= 0.66
+    # Much sparser plants outside oases
+    tiles = np.where(flat & (detail > 0.75) & (scatter > 0.97), PALM_TREE, tiles)
     tiles = np.where(
-        flat & (detail < 0.35) & (scatter > 0.95) & (tiles == SAND), CACTUS, tiles
+        flat & (detail < 0.25) & (scatter > 0.98) & (tiles == SAND), CACTUS, tiles
     )
-    tiles = np.where(flat & (scatter > 0.985) & (tiles == SAND), DEAD_BUSH, tiles)
-    tiles = np.where(flat & (scatter > 0.975) & (tiles == SAND), ROCK, tiles)
+    tiles = np.where(flat & (scatter > 0.995) & (tiles == SAND), DEAD_BUSH, tiles)
+    tiles = np.where(flat & (scatter > 0.99) & (tiles == SAND), ROCK, tiles)
     tiles = np.where(flat & (detail > 0.55) & (tiles == SAND), SAND_DARK, tiles)
 
-    # --- Oasis generation ~150 tiles from spawn (center) ---
+    # --- Oasis generation 75–100 tiles from spawn (center) ---
     _place_oases(tiles, elev, scatter, seed)
+
+    # Clear all plants within 75 tiles of center (desert before oases)
+    cx, cy = MAP_W // 2, MAP_H // 2
+    xs = np.arange(MAP_W, dtype=np.float32)
+    ys = np.arange(MAP_H, dtype=np.float32)
+    dist_from_center = np.sqrt((xs[None, :] - cx) ** 2 + (ys[:, None] - cy) ** 2)
+    plant_tiles = (
+        (tiles == PALM_TREE)
+        | (tiles == CACTUS)
+        | (tiles == DEAD_BUSH)
+        | (tiles == ROCK)
+    )
+    tiles = np.where((dist_from_center < 75) & plant_tiles, SAND, tiles)
 
     # Convert to tuple[tuple[int, ...], ...]
     return tuple(tuple(int(v) for v in row) for row in tiles)
@@ -134,7 +148,7 @@ def _place_oases(
     scatter: np.ndarray,
     seed: int,
 ) -> None:
-    """Place oases in low-elevation basins roughly 150 tiles from center."""
+    """Place 3 similarly-sized oases with centers 85–110 tiles from spawn."""
     cx, cy = MAP_W // 2, MAP_H // 2
 
     # Distance from center for every tile
@@ -142,37 +156,33 @@ def _place_oases(
     ys = np.arange(MAP_H, dtype=np.float32)
     dist = np.sqrt((xs[None, :] - cx) ** 2 + (ys[:, None] - cy) ** 2)
 
-    # Ring mask: 100–200 tiles from center
-    ring = (dist >= 100) & (dist <= 200)
-    # Only flat, non-cliff tiles
+    # Ring mask: centers at 85–110 so edges start at ~75–100
+    ring = (dist >= 85) & (dist <= 110)
     flat = (tiles == SAND) | (tiles == SAND_DARK)
     candidates = ring & flat
 
-    # Find the lowest-elevation spots in the ring as oasis centers
-    masked_elev = np.where(candidates, elev, 1.0)
-
-    # Use a deterministic hash to pick several oasis centers from the low spots
-    rng = np.random.RandomState(seed + 9999)
-    num_oases = rng.randint(4, 8)
-
-    # Find the lowest N% of tiles in the ring and sample centers from them
     if not candidates.any():
         return
-    threshold = np.percentile(masked_elev[candidates], 15)
+
+    # Find low-elevation spots in the ring
+    masked_elev = np.where(candidates, elev, 1.0)
+    threshold = np.percentile(masked_elev[candidates], 20)
     low_spots = candidates & (elev <= threshold)
     low_ys, low_xs = np.where(low_spots)
     if len(low_ys) == 0:
         return
 
-    # Pick oasis centers spread apart
+    rng = np.random.RandomState(seed + 9999)
+    num_oases = 3
+
+    # Pick 3 oasis centers spread apart (minimum 50 tiles between centers)
     centers = []
     indices = rng.permutation(len(low_ys))
     for idx in indices:
         oy, ox = int(low_ys[idx]), int(low_xs[idx])
-        # Ensure minimum spacing of 40 tiles between oasis centers
         too_close = False
-        for (py, px) in centers:
-            if abs(oy - py) + abs(ox - px) < 40:
+        for py, px in centers:
+            if abs(oy - py) + abs(ox - px) < 50:
                 too_close = True
                 break
         if not too_close:
@@ -180,11 +190,11 @@ def _place_oases(
             if len(centers) >= num_oases:
                 break
 
-    # Paint each oasis
+    # Paint each oasis with similar size (radius 12–14)
     for oy, ox in centers:
-        oasis_radius = rng.randint(8, 16)
-        water_radius = max(3, oasis_radius - 4)
-        deep_radius = max(1, water_radius - 2)
+        oasis_radius = rng.randint(12, 15)
+        water_radius = oasis_radius - 4
+        deep_radius = water_radius - 2
 
         for dy in range(-oasis_radius, oasis_radius + 1):
             for dx in range(-oasis_radius, oasis_radius + 1):
@@ -194,7 +204,6 @@ def _place_oases(
                 d = (dy * dy + dx * dx) ** 0.5
                 current = tiles[ty, tx]
 
-                # Skip cliffs
                 if current in (CLIFF, CLIFF_EDGE):
                     continue
 
@@ -203,7 +212,6 @@ def _place_oases(
                 elif d <= water_radius:
                     tiles[ty, tx] = WATER
                 elif d <= water_radius + 2:
-                    # Dense bush ring right around water
                     h = (seed ^ (tx * 374761393) ^ (ty * 668265263)) % 1000
                     if h < 333:
                         tiles[ty, tx] = BUSH_GREEN
@@ -212,7 +220,6 @@ def _place_oases(
                     else:
                         tiles[ty, tx] = BUSH_BERRY
                 elif d <= oasis_radius:
-                    # Sparse vegetation ring with palm trees
                     h = (seed ^ (tx * 374761393) ^ (ty * 668265263)) % 100
                     if h < 15:
                         tiles[ty, tx] = PALM_TREE
