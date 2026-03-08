@@ -37,6 +37,7 @@ class Backspace(Msg):
 class MapGenerated(Msg):
     tilemap: tuple[tuple[int, ...], ...]
     seed: int
+    objects: tuple
 
 
 @dataclass(frozen=True)

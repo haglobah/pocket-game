@@ -37,8 +37,8 @@ PYXEL_KEYS = {c: getattr(pyxel, f"KEY_{c.upper()}") for c in TYPEABLE}
 def interpret_cmd(cmd: Cmd) -> list[Msg]:
     match cmd:
         case GenerateMap(seed=s):
-            tm = generate_map(s)
-            return [MapGenerated(tilemap=tm, seed=s)]
+            tm, objects = generate_map(s)
+            return [MapGenerated(tilemap=tm, seed=s, objects=objects)]
         # sounds
         case PlayMainThemeMusic():
             pyxel.play(0, 0, loop=True)
@@ -80,7 +80,8 @@ class App:
             display_scale=1,
         )
         pyxel.images[0].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "karl_sprites.png"))
-        pyxel.images[1].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "environment_sprites.png"))
+        # pyxel.images[1].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "environment_sprites.png"))
+        pyxel.images[1].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "also_without_berries.png"))
         define_sounds()
         self.model, cmds = init()
         self._process_cmds(cmds)

@@ -3,6 +3,7 @@ import numpy as np
 from .constants import (
     MAP_W,
     MAP_H,
+    Point,
     SAND,
     SAND_DARK,
     CLIFF,
@@ -17,6 +18,7 @@ from .constants import (
     BUSH_FLOWERING,
     BUSH_BERRY,
 )
+from .model import PlantObject
 
 
 def _hash_grid(seed: int, cols: int, rows: int) -> np.ndarray:
@@ -76,8 +78,8 @@ def _scatter_grid(seed: int) -> np.ndarray:
     return (h % np.uint32(1000)).astype(np.float32) * np.float32(0.001)
 
 
-def generate_map(seed: int) -> tuple[tuple[int, ...], ...]:
-    """Generate the 2000x1000 desert tile map from a seed."""
+def generate_map(seed: int) -> tuple[tuple[tuple[int, ...], ...], tuple[PlantObject, ...]]:
+    """Generate the 2000x1000 desert tile map and plant objects from a seed."""
     # Build noise grids and sample all 4 elevation octaves
     weights = np.array([1.0, 0.5, 0.25, 0.125], dtype=np.float32)
     total_weight = weights.sum()
@@ -138,8 +140,20 @@ def generate_map(seed: int) -> tuple[tuple[int, ...], ...]:
     )
     tiles = np.where((dist_from_center < 75) & plant_tiles, SAND, tiles)
 
+    # Extract plant objects from tiles and replace with sand
+    _PLANT_KIND = {PALM_TREE: "palm_tree", CACTUS: "cactus", BUSH_BERRY: "bush_berry"}
+    objects: list[PlantObject] = []
+    for tile_type, kind in _PLANT_KIND.items():
+        ys_found, xs_found = np.where(tiles == tile_type)
+        for y, x in zip(ys_found, xs_found):
+            objects.append(PlantObject(anchor=Point(int(x), int(y)), kind=kind, has_fruit=True))
+        # Replace plant tiles with sand (use SAND_DARK for variety based on scatter)
+        mask = tiles == tile_type
+        tiles = np.where(mask & (scatter > 0.5), SAND_DARK, np.where(mask, SAND, tiles))
+
     # Convert to tuple[tuple[int, ...], ...]
-    return tuple(tuple(int(v) for v in row) for row in tiles)
+    tilemap = tuple(tuple(int(v) for v in row) for row in tiles)
+    return tilemap, tuple(objects)
 
 
 def _place_oases(
