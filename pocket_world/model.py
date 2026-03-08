@@ -30,6 +30,7 @@ class Player:
     breathing_mode: str
     hydration: int
     hunger: int
+    poison_timer: int
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,7 @@ class Map:
     tilemap: tuple[tuple[int, ...], ...]
     seed: int
     objects: tuple[PlantObject, ...]
+    poison_water: frozenset
 
     def __post_init__(self):
         object.__setattr__(self, '_anchor_set', frozenset(obj.anchor for obj in self.objects))
@@ -91,11 +93,13 @@ def init() -> tuple[Model, list]:
             breathing_mode=LUNGS,
             hydration=HYDRATION_START,
             hunger=HUNGER_START,
+            poison_timer=0,
         ),
         map=Map(
             tilemap=(),
             seed=0,
             objects=(),
+            poison_water=frozenset(),
         ),
         cycle=Cycle(
             number=1,

@@ -23,8 +23,8 @@ ROCK = 7
 WATER = 8
 WATER_DEEP = 9
 BUSH_GREEN = 10
-BUSH_FLOWERING = 11
-BUSH_BERRY = 12
+BUSH_RED = 11
+BUSH_YELLOW = 12
 
 # Keep old names mapped for compatibility
 GRASS = SAND
@@ -36,7 +36,7 @@ BUSH = DEAD_BUSH
 
 
 def is_walkable(tile: int) -> bool:
-    return tile in (SAND, SAND_DARK, DEAD_BUSH, BUSH_GREEN, BUSH_FLOWERING)
+    return tile in (SAND, SAND_DARK, DEAD_BUSH, BUSH_GREEN, BUSH_RED, BUSH_YELLOW)
 
 
 def is_swimmable(tile: int) -> bool:
@@ -65,6 +65,10 @@ HUNGER_MAX = 10 * 60 * 60  # 10 min at 60fps
 HUNGER_START = 3 * 60 * 60  # 10 min at 60fps
 HUNGER_REFILL = 5 * 60 * 60  # 5 min per eat
 HUNGER_DEPLETION = 1  # frames lost per frame
+
+# Poison system
+POISON_DURATION = 10 * 60  # 10 seconds at 60fps
+POISON_O2_DRAIN = 6  # O2 drained per frame while poisoned
 
 # Drinkable tiles
 DRINK_TILES = (8, 9)  # WATER, WATER_DEEP

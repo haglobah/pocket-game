@@ -22,8 +22,8 @@ from .constants import (
     DEAD_BUSH,
     ROCK,
     BUSH_GREEN,
-    BUSH_FLOWERING,
-    BUSH_BERRY,
+    BUSH_RED,
+    BUSH_YELLOW,
     GRASS,
     TALL_GRASS,
     FLOWERS,
@@ -116,8 +116,8 @@ _MINIMAP_COLORS = {
     WATER: 5,
     WATER_DEEP: 1,
     BUSH_GREEN: 3,
-    BUSH_FLOWERING: 14,
-    BUSH_BERRY: 8,
+    BUSH_RED: 8,
+    BUSH_YELLOW: 10,
 }
 
 # Cache the seed for which image bank 2 has been written
@@ -243,22 +243,34 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
         pyxel.circ(sx + 12, sy + 18, 7, 11)
         pyxel.circ(sx + 20, sy + 17, 6, 3)
         pyxel.circ(sx + 16, sy + 14, 5, 11)
-    elif tile == BUSH_FLOWERING:
-        # Flowering bush — green with pink/yellow flowers
+    elif tile == BUSH_RED:
+        # Bush with red fruit — indicates poisonous water
         pyxel.rect(sx, sy, 32, 32, 10)
         # Bush body
         pyxel.circ(sx + 16, sy + 20, 9, 3)
         pyxel.circ(sx + 12, sy + 17, 6, 11)
         pyxel.circ(sx + 20, sy + 17, 6, 3)
-        # Flowers
-        pyxel.circ(sx + 10, sy + 15, 2, 14)
+        # Red fruit
+        pyxel.circ(sx + 10, sy + 15, 2, 8)
+        pyxel.circ(sx + 18, sy + 13, 2, 8)
+        pyxel.circ(sx + 22, sy + 16, 2, 8)
+        pyxel.circ(sx + 14, sy + 12, 2, 8)
+        pyxel.pset(sx + 10, sy + 15, 2)
+        pyxel.pset(sx + 18, sy + 13, 2)
+    elif tile == BUSH_YELLOW:
+        # Bush with yellow fruit — indicates poisonous water
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Bush body
+        pyxel.circ(sx + 16, sy + 20, 9, 3)
+        pyxel.circ(sx + 12, sy + 17, 6, 11)
+        pyxel.circ(sx + 20, sy + 17, 6, 3)
+        # Yellow fruit
+        pyxel.circ(sx + 10, sy + 15, 2, 10)
         pyxel.circ(sx + 18, sy + 13, 2, 10)
-        pyxel.circ(sx + 22, sy + 16, 2, 14)
+        pyxel.circ(sx + 22, sy + 16, 2, 10)
         pyxel.circ(sx + 14, sy + 12, 2, 10)
-        pyxel.pset(sx + 10, sy + 15, 7)
-        pyxel.pset(sx + 18, sy + 13, 7)
-    elif tile == BUSH_BERRY:
-        pyxel.blt(sx, sy, 1, 32, 32, 32, 32)
+        pyxel.pset(sx + 10, sy + 15, 9)
+        pyxel.pset(sx + 18, sy + 13, 9)
         # # Berry bush — green with red/purple berries
         # pyxel.rect(sx, sy, 32, 32, 10)
         # # Bush body
@@ -502,11 +514,11 @@ def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
         ty += line_h
 
 
-_PLANT_MINIMAP_COLORS = {
-    "palm_tree": 11,
-    "cactus": 3,
-    "bush_berry": 8,
-}
+# _PLANT_MINIMAP_COLORS = {
+#     "palm_tree": 11,
+#     "cactus": 3,
+#     "bush_berry": 8,
+# }
 
 
 def _ensure_minimap(model: Model):
@@ -521,12 +533,12 @@ def _ensure_minimap(model: Model):
             tx = mx * MINIMAP_SCALE
             tile = model.map.tilemap[ty][tx]
             img.pset(mx, my, _MINIMAP_COLORS.get(tile, 0))
-    # Overlay plant objects on minimap
-    for obj in model.map.objects:
-        mx = obj.anchor.x // MINIMAP_SCALE
-        my = obj.anchor.y // MINIMAP_SCALE
-        if 0 <= mx < MINIMAP_W and 0 <= my < MINIMAP_H:
-            img.pset(mx, my, _PLANT_MINIMAP_COLORS.get(obj.kind, 0))
+    # # Overlay plant objects on minimap
+    # for obj in model.map.objects:
+    #     mx = obj.anchor.x // MINIMAP_SCALE
+    #     my = obj.anchor.y // MINIMAP_SCALE
+    #     if 0 <= mx < MINIMAP_W and 0 <= my < MINIMAP_H:
+    #         img.pset(mx, my, _PLANT_MINIMAP_COLORS.get(obj.kind, 0))
     _minimap_cache_seed = model.map.seed
 
 
@@ -648,8 +660,8 @@ def view_play(model: Model):
         WATER: "water",
         WATER_DEEP: "deep_water",
         BUSH_GREEN: "bush_green",
-        BUSH_FLOWERING: "bush_flower",
-        BUSH_BERRY: "bush_berry",
+        BUSH_RED: "bush_red",
+        BUSH_YELLOW: "bush_yellow",
     }
     map_bottom = VIEWPORT_H * TILE_SIZE
     pyxel.rect(0, map_bottom, SCREEN_W, DEBUG_HEIGHT, 0)

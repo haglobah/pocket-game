@@ -37,8 +37,8 @@ PYXEL_KEYS = {c: getattr(pyxel, f"KEY_{c.upper()}") for c in TYPEABLE}
 def interpret_cmd(cmd: Cmd) -> list[Msg]:
     match cmd:
         case GenerateMap(seed=s):
-            tm, objects = generate_map(s)
-            return [MapGenerated(tilemap=tm, seed=s, objects=objects)]
+            tm, objects, poison_water = generate_map(s)
+            return [MapGenerated(tilemap=tm, seed=s, objects=objects, poison_water=poison_water)]
         # sounds
         case PlayMainThemeMusic():
             pyxel.play(0, 0, loop=True)
