@@ -131,6 +131,14 @@ def _find_spawn(tilemap: tuple[tuple[int, ...], ...], objects: tuple[PlantObject
                         return p
     return Point(cx, cy)
 
+def transition_to_death(model: Model, reason: str) -> tuple[Model, list[Cmd]]:
+    cycle = model.cycle
+    game = model.game
+    return replace(model,
+        player=replace(model.player, o2=O2_MAX, poison_timer=0),
+        cycle=replace(cycle, death_reason=reason, death_timer=0),
+        game=replace(game, frame=game.frame + 1, state="dead"),
+    ), [PlayDeathScreenMusic()]
 
 def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
     player = model.player
@@ -175,11 +183,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                         reason = "Suffocated (gills ran dry)"
                     else:
                         reason = "Ran out of oxygen"
-                    return replace(model,
-                        player=replace(player, o2=O2_MAX, poison_timer=0),
-                        cycle=replace(cycle, death_reason=reason, death_timer=0),
-                        game=replace(game, frame=game.frame + 1, state="dead"),
-                    ), []
+                    return transition_to_death(model, reason)
                 # Thought bubble management
                 new_cooldown = max(0, new_cooldown - 1)
                 if new_thought is not None:
@@ -211,17 +215,9 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             new_hunger = max(0, player.hunger - HUNGER_DEPLETION)
             if game.state == "play":
                 if new_hydration <= 0:
-                    return replace(model,
-                        player=replace(player, o2=new_o2, hydration=0, hunger=new_hunger, poison_timer=new_poison),
-                        cycle=replace(cycle, death_reason="Died of dehydration", death_timer=0),
-                        game=replace(game, frame=game.frame + 1, state="dead"),
-                    ), []
+                    return transition_to_death(model, "Died of dehydration")
                 if new_hunger <= 0:
-                    return replace(model,
-                        player=replace(player, o2=new_o2, hydration=new_hydration, hunger=0, poison_timer=new_poison),
-                        cycle=replace(cycle, death_reason="Died of starvation", death_timer=0),
-                        game=replace(game, frame=game.frame + 1, state="dead"),
-                    ), []
+                    return transition_to_death(model, "Died of starvation")
             return replace(model,
                 player=replace(player,
                     move_timer=max(0, player.move_timer - 1),
@@ -349,7 +345,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             return replace(model,
                 cycle=replace(cycle, death_reason=r, death_timer=0),
                 game=replace(game, state="dead"),
-            ), []
+            ), [PlayDeathScreenMusic()]
 
         case DismissDeathScreen():
             if game.state == "dead" and cycle.death_timer >= DEATH_SCREEN_MIN_FRAMES:

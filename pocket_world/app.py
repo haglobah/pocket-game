@@ -46,6 +46,8 @@ def interpret_cmd(cmd: Cmd) -> list[Msg]:
             pyxel.play(0, 1, loop=True)
         case PlayTitleThemeMusic():
             pyxel.play(0, 2, loop=True)
+        case PlayDeathScreenMusic():
+            pyxel.play(0, 3, loop=True)
         case PlayStepSound():
             pyxel.play(1, 16)
         case PlaySwimSound():
@@ -64,6 +66,8 @@ def define_sounds():
     pyxel.sounds[1].pcm(str(_PROJECT_ROOT / "assets/audio/01_soundtrack_boss_fight.wav"))
     # Title screen music
     pyxel.sounds[2].pcm(str(_PROJECT_ROOT / "assets/audio/02_titlescreen_loud.wav"))
+    # Death screen music
+    pyxel.sounds[3].pcm(str(_PROJECT_ROOT / "assets/audio/03_death_screen_track.wav"))
     # Soft footstep sound
     pyxel.sounds[16].pcm(str(_PROJECT_ROOT / "assets/audio/16_steps.ogg"))
     # Thought bubble chime — gentle ascending two-note
