@@ -29,6 +29,7 @@ from .messages import (
 from .commands import (
     Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound,
     GenerateDarkWorld, PlayPunchSound, PlayHitSound, PlayBossFireSound, PlayVictorySound,
+    PlayMainThemeMusic, PlayBossThemeMusic, PlayTitleThemeMusic, PlayDeathScreenMusic,
 )
 from .mapgen import generate_map, generate_dark_world
 from .update import update
@@ -45,19 +46,27 @@ PYXEL_KEYS = {c: getattr(pyxel, f"KEY_{c.upper()}") for c in TYPEABLE}
 def interpret_cmd(cmd: Cmd) -> list[Msg]:
     match cmd:
         case GenerateMap(seed=s):
-            tm = generate_map(s)
-            return [MapGenerated(tilemap=tm, seed=s)]
+            tm, objects, poison_water = generate_map(s)
+            return [MapGenerated(tilemap=tm, seed=s, objects=objects, poison_water=poison_water)]
         case GenerateDarkWorld(seed=s, tilemap=tm):
             boss_parts, minions = generate_dark_world(s, tm)
             return [DarkWorldGenerated(boss_parts=boss_parts, minions=minions)]
+        case PlayMainThemeMusic():
+            pyxel.play(0, 0, loop=True)
+        case PlayBossThemeMusic():
+            pyxel.play(0, 1, loop=True)
+        case PlayTitleThemeMusic():
+            pyxel.play(0, 2, loop=True)
+        case PlayDeathScreenMusic():
+            pyxel.play(0, 3, loop=True)
         case PlayStepSound():
-            pyxel.play(0, 16)
+            pyxel.play(1, 16)
         case PlaySwimSound():
-            pyxel.play(0, 17)
+            pyxel.play(1, 17)
         case PlayThoughtSound():
-            pyxel.play(0, 18)
+            pyxel.play(2, 47)
         case PlayEatingSound():
-            pyxel.play(0, 31)
+            pyxel.play(1, 31)
         case PlayPunchSound():
             pyxel.play(1, 41)
         case PlayHitSound():
@@ -70,12 +79,22 @@ def interpret_cmd(cmd: Cmd) -> list[Msg]:
 
 
 def define_sounds():
+    # Main theme music
+    pyxel.sounds[0].pcm(str(_PROJECT_ROOT / "assets/audio/00_soundtrack_main.wav"))
+    # Boss theme music
+    pyxel.sounds[1].pcm(str(_PROJECT_ROOT / "assets/audio/01_soundtrack_boss_fight.wav"))
+    # Title screen music
+    pyxel.sounds[2].pcm(str(_PROJECT_ROOT / "assets/audio/02_titlescreen_loud.wav"))
+    # Death screen music
+    pyxel.sounds[3].pcm(str(_PROJECT_ROOT / "assets/audio/03_death_screen_track.wav"))
     # Soft footstep sound
     pyxel.sounds[16].pcm(str(_PROJECT_ROOT / "assets/audio/16_steps.ogg"))
     # Thought bubble chime — gentle ascending two-note
     pyxel.sounds[17].pcm(str(_PROJECT_ROOT / "assets/audio/17_water_bubble.ogg"))
     # Eating sound
     pyxel.sounds[31].pcm(str(_PROJECT_ROOT / "assets/audio/31_bite.ogg"))
+    # Thought bubble sound
+    pyxel.sounds[47].pcm(str(_PROJECT_ROOT / "assets/audio/47_thought_bubble.ogg"))
     # Punch — short percussive hit
     pyxel.sounds[41].set("c3c2", "pp", "76", "f", 6)
     # Player hit — descending buzz
@@ -88,21 +107,6 @@ def define_sounds():
 
 _DARK_ASSETS = _PROJECT_ROOT / "assets" / "dark_pocket_world"
 
-# Sprite layout in image bank 2 for dark world:
-# (0,0)    : dark_environment_sprites.png (256x256, same layout as normal env)
-# Minions packed at y=128 as 32x32 sprites:
-#   (0,128)=squid_left, (32,128)=squid_right
-#   (64,128)=squid_small_left, (96,128)=squid_small_right
-#   (128,128)=scorpion_left, (160,128)=scorpion_right
-#   (192,128)=golem_left, (224,128)=golem_right
-# Boss parts packed at y=160 as 64x64 sprites:
-#   (0,160)=head, (64,160)=wings, (128,160)=arms, (192,160)=tail_legs
-# Projectiles at y=224 as 32x32:
-#   (0,224)=projectile_1, (32,224)=projectile_2
-# Orbs at (64,224) 32x32:
-#   (64,224)=orb_left, (96,224)=orb_right
-# Portal frames at y=128 x offset 0..4 * 32 in bank 3:
-#   (0,0)...(128,0) as 32x32 frames
 
 def _scale_and_save(src_path: str, w: int, h: int) -> str:
     """Scale a PNG to (w, h) using PIL, save to temp file, return path."""
@@ -115,11 +119,9 @@ def _scale_and_save(src_path: str, w: int, h: int) -> str:
 
 def _load_dark_sprites():
     """Load dark world sprites into image banks."""
-    # Dark environment tiles into bank 2 (same layout as bank 1 normal env)
     dark_env = str(_DARK_ASSETS / "dark_environment_sprites.png")
     pyxel.images[2].load(0, 0, dark_env)
 
-    # All sprites use DARK_SPRITE_MAP for bank/position/size
     _all_sprites = [
         ("squid", "minions/squid_left.png"),
         ("squid_small", "minions/squid_small_left.png"),
@@ -147,7 +149,7 @@ class App:
             display_scale=1,
         )
         pyxel.images[0].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "karl_sprites.png"))
-        pyxel.images[1].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "environment_sprites.png"))
+        pyxel.images[1].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "also_without_berries.png"))
         _load_dark_sprites()
         define_sounds()
         self.model, cmds = init()

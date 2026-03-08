@@ -23,8 +23,8 @@ ROCK = 7
 WATER = 8
 WATER_DEEP = 9
 BUSH_GREEN = 10
-BUSH_FLOWERING = 11
-BUSH_BERRY = 12
+BUSH_RED = 11
+BUSH_YELLOW = 12
 PORTAL = 13
 DARK_FLOOR = 14
 DARK_WALL = 15
@@ -39,7 +39,7 @@ BUSH = DEAD_BUSH
 
 
 def is_walkable(tile: int) -> bool:
-    return tile in (SAND, SAND_DARK, DEAD_BUSH, BUSH_GREEN, BUSH_FLOWERING, BUSH_BERRY, PORTAL, DARK_FLOOR)
+    return tile in (SAND, SAND_DARK, DEAD_BUSH, BUSH_GREEN, BUSH_RED, BUSH_YELLOW, PORTAL, DARK_FLOOR)
 
 
 def is_swimmable(tile: int) -> bool:
@@ -69,8 +69,11 @@ HUNGER_START = 3 * 60 * 60  # 10 min at 60fps
 HUNGER_REFILL = 5 * 60 * 60  # 5 min per eat
 HUNGER_DEPLETION = 1  # frames lost per frame
 
-# Edible / drinkable tiles
-FOOD_TILES = (4, 5, 12)  # PALM_TREE, CACTUS, BUSH_BERRY
+# Poison system
+POISON_DURATION = 10 * 60  # 10 seconds at 60fps
+POISON_O2_DRAIN = 6  # O2 drained per frame while poisoned
+
+# Drinkable tiles
 DRINK_TILES = (8, 9)  # WATER, WATER_DEEP
 
 # Death screen / rewind

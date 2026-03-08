@@ -3,6 +3,7 @@ import numpy as np
 from .constants import (
     MAP_W,
     MAP_H,
+    Point,
     SAND,
     SAND_DARK,
     CLIFF,
@@ -14,14 +15,14 @@ from .constants import (
     WATER,
     WATER_DEEP,
     BUSH_GREEN,
-    BUSH_FLOWERING,
-    BUSH_BERRY,
+    BUSH_RED,
+    BUSH_YELLOW,
     PORTAL,
     BOSS_PARTS,
     MINION_CONFIGS,
-    Point,
     is_walkable,
 )
+from .model import PlantObject
 
 
 def _hash_grid(seed: int, cols: int, rows: int) -> np.ndarray:
@@ -81,8 +82,8 @@ def _scatter_grid(seed: int) -> np.ndarray:
     return (h % np.uint32(1000)).astype(np.float32) * np.float32(0.001)
 
 
-def generate_map(seed: int) -> tuple[tuple[int, ...], ...]:
-    """Generate the 2000x1000 desert tile map from a seed."""
+def generate_map(seed: int) -> tuple[tuple[tuple[int, ...], ...], tuple[PlantObject, ...], frozenset]:
+    """Generate the 2000x1000 desert tile map and plant objects from a seed."""
     # Build noise grids and sample all 4 elevation octaves
     weights = np.array([1.0, 0.5, 0.25, 0.125], dtype=np.float32)
     total_weight = weights.sum()
@@ -128,7 +129,7 @@ def generate_map(seed: int) -> tuple[tuple[int, ...], ...]:
     tiles = np.where(flat & (detail > 0.55) & (tiles == SAND), SAND_DARK, tiles)
 
     # --- Oasis generation 75–100 tiles from spawn (center) ---
-    _place_oases(tiles, elev, scatter, seed)
+    poison_water = _place_oases(tiles, elev, scatter, seed)
 
     # Clear all plants within 75 tiles of center (desert before oases)
     cx, cy = MAP_W // 2, MAP_H // 2
@@ -143,11 +144,22 @@ def generate_map(seed: int) -> tuple[tuple[int, ...], ...]:
     )
     tiles = np.where((dist_from_center < 75) & plant_tiles, SAND, tiles)
 
-    # Place portal 150–250 tiles from center on a walkable tile
+    # Extract plant objects from tiles and replace with sand
+    _PLANT_KIND = {PALM_TREE: "palm_tree", CACTUS: "cactus"}
+    objects: list[PlantObject] = []
+    for tile_type, kind in _PLANT_KIND.items():
+        ys_found, xs_found = np.where(tiles == tile_type)
+        for y, x in zip(ys_found, xs_found):
+            objects.append(PlantObject(anchor=Point(int(x), int(y)), kind=kind, has_fruit=True))
+        mask = tiles == tile_type
+        tiles = np.where(mask & (scatter > 0.5), SAND_DARK, np.where(mask, SAND, tiles))
+
+    # Place portal near spawn for testing
     _place_portal(tiles, seed)
 
     # Convert to tuple[tuple[int, ...], ...]
-    return tuple(tuple(int(v) for v in row) for row in tiles)
+    tilemap = tuple(tuple(int(v) for v in row) for row in tiles)
+    return tilemap, tuple(objects), poison_water
 
 
 def _place_oases(
@@ -155,8 +167,13 @@ def _place_oases(
     elev: np.ndarray,
     scatter: np.ndarray,
     seed: int,
-) -> None:
-    """Place 3 similarly-sized oases with centers 85–110 tiles from spawn."""
+) -> frozenset:
+    """Place 3 oases: 1 drinkable (green bushes), 2 poisonous (red/yellow bushes).
+
+    Returns a frozenset of Point positions containing poisonous water.
+    """
+    from .constants import Point
+
     cx, cy = MAP_W // 2, MAP_H // 2
 
     # Distance from center for every tile
@@ -170,7 +187,7 @@ def _place_oases(
     candidates = ring & flat
 
     if not candidates.any():
-        return
+        return frozenset()
 
     # Find low-elevation spots in the ring
     masked_elev = np.where(candidates, elev, 1.0)
@@ -178,7 +195,7 @@ def _place_oases(
     low_spots = candidates & (elev <= threshold)
     low_ys, low_xs = np.where(low_spots)
     if len(low_ys) == 0:
-        return
+        return frozenset()
 
     rng = np.random.RandomState(seed + 9999)
     num_oases = 3
@@ -198,11 +215,26 @@ def _place_oases(
             if len(centers) >= num_oases:
                 break
 
+    # Assign bush types: first oasis = drinkable (green), others = poisonous
+    # Shuffle so the drinkable one isn't always the same spatially
+    oasis_order = list(range(len(centers)))
+    rng.shuffle(oasis_order)
+    # oasis_order[0] = drinkable (green), [1] = red (poison), [2] = yellow (poison)
+    bush_types = {oasis_order[0]: BUSH_GREEN}
+    if len(oasis_order) > 1:
+        bush_types[oasis_order[1]] = BUSH_RED
+    if len(oasis_order) > 2:
+        bush_types[oasis_order[2]] = BUSH_YELLOW
+
+    poison_positions: set = set()
+
     # Paint each oasis with similar size (radius 12–14)
-    for oy, ox in centers:
+    for i, (oy, ox) in enumerate(centers):
         oasis_radius = rng.randint(12, 15)
         water_radius = oasis_radius - 4
         deep_radius = water_radius - 2
+        bush_type = bush_types.get(i, BUSH_GREEN)
+        is_poisonous = bush_type != BUSH_GREEN
 
         for dy in range(-oasis_radius, oasis_radius + 1):
             for dx in range(-oasis_radius, oasis_radius + 1):
@@ -217,29 +249,27 @@ def _place_oases(
 
                 if d <= deep_radius:
                     tiles[ty, tx] = WATER_DEEP
+                    if is_poisonous:
+                        poison_positions.add(Point(tx, ty))
                 elif d <= water_radius:
                     tiles[ty, tx] = WATER
+                    if is_poisonous:
+                        poison_positions.add(Point(tx, ty))
                 elif d <= water_radius + 2:
-                    h = (seed ^ (tx * 374761393) ^ (ty * 668265263)) % 1000
-                    if h < 333:
-                        tiles[ty, tx] = BUSH_GREEN
-                    elif h < 666:
-                        tiles[ty, tx] = BUSH_FLOWERING
-                    else:
-                        tiles[ty, tx] = BUSH_BERRY
+                    tiles[ty, tx] = bush_type
                 elif d <= oasis_radius:
                     h = (seed ^ (tx * 374761393) ^ (ty * 668265263)) % 100
                     if h < 15:
                         tiles[ty, tx] = PALM_TREE
                     elif h < 25:
-                        bush_h = h % 3
-                        tiles[ty, tx] = [BUSH_GREEN, BUSH_FLOWERING, BUSH_BERRY][bush_h]
+                        tiles[ty, tx] = bush_type
+
+    return frozenset(poison_positions)
 
 
 def _place_portal(tiles: np.ndarray, seed: int) -> None:
     """Place a PORTAL tile near spawn for easy testing."""
     cx, cy = MAP_W // 2, MAP_H // 2
-    # Place 3 tiles to the right of center spawn
     for dx in range(3, 20):
         tx = cx + dx
         if 0 <= tx < MAP_W and is_walkable(tiles[cy, tx]):
@@ -254,7 +284,6 @@ def generate_dark_world(seed: int, tilemap: tuple) -> tuple[tuple, tuple]:
     """
     rng = np.random.RandomState(seed + 77777)
 
-    # Boss positioned at center-north of map
     boss_cx = MAP_W // 2
     boss_cy = MAP_H // 2 - 20
     boss_parts_data = tuple(
@@ -264,7 +293,6 @@ def generate_dark_world(seed: int, tilemap: tuple) -> tuple[tuple, tuple]:
         for name, cfg in BOSS_PARTS.items()
     )
 
-    # Spawn minions on walkable tiles around the boss area
     minions_data = []
     for kind, hp, move_delay, count in MINION_CONFIGS:
         for _ in range(count):

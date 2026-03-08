@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+
+from pocket_world.commands import PlayTitleThemeMusic
 from .constants import (
     MAP_W,
     MAP_H,
@@ -31,15 +33,31 @@ class Player:
     breathing_mode: str
     hydration: int
     hunger: int
+    poison_timer: int
     hp: int = PLAYER_MAX_HP
     invincible_timer: int = 0
     punch_timer: int = 0
 
 
 @dataclass(frozen=True)
+class PlantObject:
+    anchor: Point
+    kind: str
+    has_fruit: bool
+
+
+@dataclass(frozen=True)
 class Map:
     tilemap: tuple[tuple[int, ...], ...]
     seed: int
+    objects: tuple[PlantObject, ...]
+    poison_water: frozenset
+
+    def __post_init__(self):
+        object.__setattr__(self, '_anchor_set', frozenset(obj.anchor for obj in self.objects))
+
+    def has_object_at(self, pos: Point) -> bool:
+        return pos in self._anchor_set
 
 
 @dataclass(frozen=True)
@@ -123,10 +141,13 @@ def init() -> tuple[Model, list]:
             breathing_mode=LUNGS,
             hydration=HYDRATION_START,
             hunger=HUNGER_START,
+            poison_timer=0,
         ),
         map=Map(
             tilemap=(),
             seed=0,
+            objects=(),
+            poison_water=frozenset(),
         ),
         cycle=Cycle(
             number=1,
@@ -145,4 +166,4 @@ def init() -> tuple[Model, list]:
             show_minimap=False,
         ),
     )
-    return model, []
+    return model, [PlayTitleThemeMusic()]

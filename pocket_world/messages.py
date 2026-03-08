@@ -37,6 +37,8 @@ class Backspace(Msg):
 class MapGenerated(Msg):
     tilemap: tuple[tuple[int, ...], ...]
     seed: int
+    objects: tuple
+    poison_water: frozenset
 
 
 @dataclass(frozen=True)

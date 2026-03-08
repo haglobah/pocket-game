@@ -28,8 +28,8 @@ from .constants import (
     DEAD_BUSH,
     ROCK,
     BUSH_GREEN,
-    BUSH_FLOWERING,
-    BUSH_BERRY,
+    BUSH_RED,
+    BUSH_YELLOW,
     GRASS,
     TALL_GRASS,
     FLOWERS,
@@ -53,7 +53,7 @@ from .constants import (
     REWIND_DURATION,
     THOUGHT_CHAR_SPEED,
 )
-from .model import Model, ThoughtBubble
+from .model import Model, PlantObject, ThoughtBubble
 
 
 _TITLE_FONT = None
@@ -122,8 +122,8 @@ _MINIMAP_COLORS = {
     WATER: 5,
     WATER_DEEP: 1,
     BUSH_GREEN: 3,
-    BUSH_FLOWERING: 14,
-    BUSH_BERRY: 8,
+    BUSH_RED: 8,
+    BUSH_YELLOW: 10,
     PORTAL: 2,
 }
 
@@ -250,22 +250,34 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int, bank: int = 1):
         pyxel.circ(sx + 12, sy + 18, 7, 11)
         pyxel.circ(sx + 20, sy + 17, 6, 3)
         pyxel.circ(sx + 16, sy + 14, 5, 11)
-    elif tile == BUSH_FLOWERING:
-        # Flowering bush — green with pink/yellow flowers
+    elif tile == BUSH_RED:
+        # Bush with red fruit — indicates poisonous water
         pyxel.rect(sx, sy, 32, 32, 10)
         # Bush body
         pyxel.circ(sx + 16, sy + 20, 9, 3)
         pyxel.circ(sx + 12, sy + 17, 6, 11)
         pyxel.circ(sx + 20, sy + 17, 6, 3)
-        # Flowers
-        pyxel.circ(sx + 10, sy + 15, 2, 14)
+        # Red fruit
+        pyxel.circ(sx + 10, sy + 15, 2, 8)
+        pyxel.circ(sx + 18, sy + 13, 2, 8)
+        pyxel.circ(sx + 22, sy + 16, 2, 8)
+        pyxel.circ(sx + 14, sy + 12, 2, 8)
+        pyxel.pset(sx + 10, sy + 15, 2)
+        pyxel.pset(sx + 18, sy + 13, 2)
+    elif tile == BUSH_YELLOW:
+        # Bush with yellow fruit — indicates poisonous water
+        pyxel.rect(sx, sy, 32, 32, 10)
+        # Bush body
+        pyxel.circ(sx + 16, sy + 20, 9, 3)
+        pyxel.circ(sx + 12, sy + 17, 6, 11)
+        pyxel.circ(sx + 20, sy + 17, 6, 3)
+        # Yellow fruit
+        pyxel.circ(sx + 10, sy + 15, 2, 10)
         pyxel.circ(sx + 18, sy + 13, 2, 10)
-        pyxel.circ(sx + 22, sy + 16, 2, 14)
+        pyxel.circ(sx + 22, sy + 16, 2, 10)
         pyxel.circ(sx + 14, sy + 12, 2, 10)
-        pyxel.pset(sx + 10, sy + 15, 7)
-        pyxel.pset(sx + 18, sy + 13, 7)
-    elif tile == BUSH_BERRY:
-        pyxel.blt(sx, sy, bank, 32, 32, 32, 32)
+        pyxel.pset(sx + 10, sy + 15, 9)
+        pyxel.pset(sx + 18, sy + 13, 9)
     elif tile == PORTAL:
         pyxel.rect(sx, sy, 32, 32, 0)
         anim = (frame // 8) % 5
@@ -281,6 +293,25 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int, bank: int = 1):
             lx = cx + int(math.cos(angle) * r_outer)
             ly = cy + int(math.sin(angle) * r_outer)
             pyxel.pset(lx, ly, 7)
+
+
+# Sprite x-offsets for plant kinds in the environment sprite sheet
+_PLANT_SPRITE_X = {
+    "palm_tree": 96,
+    "cactus": 64,
+    "bush_berry": 32,
+}
+
+
+def draw_plant(sx: int, sy: int, obj: PlantObject):
+    """Draw a plant object at screen pixel position (sx, sy)."""
+    sprite_x = _PLANT_SPRITE_X[obj.kind]
+    if obj.has_fruit:
+        # Row at y=32 in environment_sprites.png (bank 1, y=32)
+        pyxel.blt(sx, sy, 1, sprite_x, 32, 32, 32)
+    else:
+        # Eaten state: same x, but from without_berries.png loaded at y=128
+        pyxel.blt(sx, sy, 1, sprite_x + 96, 32, 32, 32)
 
 
 def draw_character(sx: int, sy: int, facing, frame: int):
@@ -497,6 +528,13 @@ def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
         ty += line_h
 
 
+# _PLANT_MINIMAP_COLORS = {
+#     "palm_tree": 11,
+#     "cactus": 3,
+#     "bush_berry": 8,
+# }
+
+
 def _ensure_minimap(model: Model):
     """Write minimap to image bank 2 if not already cached for this seed."""
     global _minimap_cache_seed
@@ -509,6 +547,12 @@ def _ensure_minimap(model: Model):
             tx = mx * MINIMAP_SCALE
             tile = model.map.tilemap[ty][tx]
             img.pset(mx, my, _MINIMAP_COLORS.get(tile, 0))
+    # # Overlay plant objects on minimap
+    # for obj in model.map.objects:
+    #     mx = obj.anchor.x // MINIMAP_SCALE
+    #     my = obj.anchor.y // MINIMAP_SCALE
+    #     if 0 <= mx < MINIMAP_W and 0 <= my < MINIMAP_H:
+    #         img.pset(mx, my, _PLANT_MINIMAP_COLORS.get(obj.kind, 0))
     _minimap_cache_seed = model.map.seed
 
 
@@ -557,6 +601,13 @@ def view_play(model: Model):
             else:
                 draw_tile(sx * TILE_SIZE, sy * TILE_SIZE, tile, model.game.frame)
 
+    # Draw plant objects visible in the viewport
+    for obj in model.map.objects:
+        ox = obj.anchor.x - cam_x
+        oy = obj.anchor.y - cam_y
+        if 0 <= ox < VIEWPORT_W and 0 <= oy < VIEWPORT_H:
+            draw_plant(ox * TILE_SIZE, oy * TILE_SIZE, obj)
+
     # Draw player at center of screen
     pcx = (VIEWPORT_W // 2) * TILE_SIZE
     pcy = (VIEWPORT_H // 2) * TILE_SIZE
@@ -569,9 +620,10 @@ def view_play(model: Model):
         _draw_thought_bubble(player_cx, player_top - 6, model.game.thought)
 
     # Status bars
-    bar_w = 100
-    bar_h = 6
-    bar_x = 10
+    hud_font = _get_hud_font()
+    bar_w = 140
+    bar_h = 12
+    bar_x = (SCREEN_W - bar_w) // 2
     bar_y = 10
 
     def _draw_bar(
@@ -580,18 +632,13 @@ def view_play(model: Model):
         col = full_col if frac > 0.5 else (mid_col if frac > 0.25 else low_col)
         pyxel.rect(bar_x - 1, y - 1, bar_w + 2, bar_h + 2, 0)
         pyxel.rect(bar_x, y, int(bar_w * frac), bar_h, col)
-        pyxel.text(bar_x + bar_w + 4, y, label, 7)
+        pyxel.text(bar_x + bar_w + 4, y, label, 7, hud_font)
 
     # O2 bar (hidden when lungs on land and full)
     underwater = is_swimmable(model.map.tilemap[py][px])
     can_auto_breathe = model.player.breathing_mode == LUNGS and not underwater
     show_o2 = not (can_auto_breathe and model.player.o2 >= O2_MAX)
     if show_o2:
-        hud_font = _get_hud_font()
-        bar_w = 140
-        bar_h = 12
-        bar_x = (SCREEN_W - bar_w) // 2
-        bar_y = 10
         o2_frac = model.player.o2 / O2_MAX
         # Background
         pyxel.rect(bar_x - 1, bar_y - 1, bar_w + 2, bar_h + 2, 0)
@@ -600,7 +647,6 @@ def view_play(model: Model):
         pyxel.rect(bar_x, bar_y, int(bar_w * o2_frac), bar_h, fill_color)
         # Label
         mode_label = "LUNGS" if model.player.breathing_mode == LUNGS else "GILLS"
-        pyxel.text(bar_x + bar_w + 8, bar_y - 1, f"O2 [{mode_label}]", 7, hud_font)
         _draw_bar(bar_y, model.player.o2 / O2_MAX, f"O2 [{mode_label}]", 11, 9, 8)
         bar_y += bar_h + 4
 
@@ -628,8 +674,8 @@ def view_play(model: Model):
         WATER: "water",
         WATER_DEEP: "deep_water",
         BUSH_GREEN: "bush_green",
-        BUSH_FLOWERING: "bush_flower",
-        BUSH_BERRY: "bush_berry",
+        BUSH_RED: "bush_red",
+        BUSH_YELLOW: "bush_yellow",
     }
     map_bottom = VIEWPORT_H * TILE_SIZE
     pyxel.rect(0, map_bottom, SCREEN_W, DEBUG_HEIGHT, 0)
