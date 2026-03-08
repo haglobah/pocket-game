@@ -10,6 +10,11 @@
 17 - steps in water
 18 - jump
 19 - land
+### Death Sounds
+23 - Drowning
+24 - Hydration
+25 - Starvation
+26 - Killed by Enemy
 ### Interactions
 31 - eating
 

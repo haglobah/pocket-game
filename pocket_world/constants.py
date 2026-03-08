@@ -135,15 +135,15 @@ MINION_CONFIGS = (
 # Sprite layout for dark world: (bank, x, y, w, h)
 # Only left-facing minions stored; right-facing uses horizontal flip
 DARK_SPRITE_MAP = {
-    "squid": (1, 0, 128, 64, 64),
-    "squid_small": (1, 64, 128, 64, 64),
-    "scorpion": (1, 0, 192, 64, 64),
-    "golem": (1, 64, 192, 64, 64),
-    "head": (1, 128, 0, 128, 128),
-    "wings": (2, 0, 128, 256, 128),
-    "arms": (1, 160, 128, 96, 128),
-    "projectile_1": (1, 128, 192, 32, 32),
-    "projectile_2": (1, 128, 224, 32, 32),
+    "squid": (2, 0, 128, 64, 64),
+    "squid_small": (2, 64, 128, 64, 64),
+    "scorpion": (2, 0, 192, 64, 64),
+    "golem": (2, 64, 192, 64, 64),
+    "head": (2, 128, 0, 128, 128),
+    "wings": (2, 0, 64, 128, 64),
+    "arms": (2, 160, 128, 96, 128),
+    "projectile_1": (2, 128, 192, 32, 32),
+    "projectile_2": (2, 128, 224, 32, 32),
 }
 
 DIR_NAME = {
