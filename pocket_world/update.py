@@ -96,8 +96,8 @@ from .messages import (
     ChooseWizardOption,
 )
 from .commands import (
-    Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound,
-    GenerateDarkWorld, PlayPunchSound, PlayHitSound, PlayBossFireSound, PlayVictorySound,
+    Cmd, GenerateMap, PlayKilledByEnemySound, PlayStepSound, PlaySuffocatingSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound,
+    GenerateDarkWorld, PlayPunchSound, PlayHitSound, PlayBossFireSound, PlayVictorySound, PlayDrowningSound, PlayDehydrationSound, PlayStarvationSound,
 )
 from .commands import PlayMainThemeMusic, PlayDeathScreenMusic
 from .thoughts import check_triggers, get_memory
@@ -418,13 +418,18 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 if new_o2 <= 0:
                     if new_poison > 0 or (player.poison_timer > 0 and new_poison == 0):
                         reason = "Suffocated from poisoned water"
+                        cmd = PlaySuffocatingSound()
                     elif player.breathing_mode == LUNGS and underwater:
                         reason = "Drowned (lungs underwater)"
+                        cmd = PlayDrowningSound()
                     elif player.breathing_mode == GILLS:
                         reason = "Suffocated (gills ran dry)"
+                        cmd = PlaySuffocatingSound()
                     else:
                         reason = "Ran out of oxygen"
-                    return transition_to_death(model, reason)
+                        cmd = PlaySuffocatingSound()
+                    new_model, cmds = transition_to_death(model, reason)
+                    return new_model, cmds + [cmd]
                 # Thought bubble management
                 new_cooldown = max(0, new_cooldown - 1)
                 if new_thought is not None:
@@ -488,7 +493,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                             player=replace(player, o2=0),
                             cycle=replace(cycle, death_reason="The wizard's blue bolts drained your oxygen", death_timer=0),
                             game=replace(game, frame=game.frame + 1, state="dead"),
-                        ), []
+                        ), [PlaySuffocatingSound()]
                 elif new_wise_outcome == "follow":
                     if game.frame % WISE_FOLLOW_STEP_FRAMES == 0:
                         next_wise = _pick_follower_tile(map_.tilemap, map_.wise_man, player.pos)
@@ -499,9 +504,9 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             new_hunger = max(0, player.hunger - HUNGER_DEPLETION)
             if game.state == "play":
                 if new_hydration <= 0:
-                    return transition_to_death(model, "Died of dehydration")
+                    return transition_to_death(model, "Died of dehydration"), [PlayDehydrationSound()]
                 if new_hunger <= 0:
-                    return transition_to_death(model, "Died of starvation")
+                    return transition_to_death(model, "Died of starvation"), [PlayStarvationSound()]
             return replace(model,
                 player=replace(player,
                     move_timer=max(0, player.move_timer - 1),
@@ -990,7 +995,7 @@ def _dark_tick(model: Model) -> tuple[Model, list[Cmd]]:
             player=replace(player, hp=0),
             cycle=replace(model.cycle, death_reason="Defeated in the Dark Pocket World", death_timer=0),
             game=replace(game, state="dead", frame=game.frame + 1),
-        ), cmds
+        ), cmds + [PlayKilledByEnemySound()]
 
     new_boss = replace(boss, fire_timer=new_fire_timer, parts=new_boss_parts)
     new_dw = replace(dw,
