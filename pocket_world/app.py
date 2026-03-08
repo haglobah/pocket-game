@@ -68,8 +68,8 @@ class App:
             fps=60,
             display_scale=1,
         )
-        pyxel.images[0].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "image0.png"))
-        pyxel.images[1].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "image1.png"))
+        pyxel.images[0].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "karl_sprites.png"))
+        pyxel.images[1].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "environment_sprites.png"))
         define_sounds()
         self.model, cmds = init()
         self._process_cmds(cmds)
