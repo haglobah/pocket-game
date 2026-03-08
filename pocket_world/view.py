@@ -2,6 +2,8 @@ import math
 
 import arcade
 from arcade.types.rect import LBWH
+import numpy as np
+from PIL import Image as PILImage
 from pathlib import Path
 
 from .constants import (
@@ -18,7 +20,6 @@ from .constants import (
     PORTAL,
     PLAYER_MAX_HP,
     PUNCH_COOLDOWN,
-    DARK_SPRITE_MAP,
     is_swimmable,
     SAND,
     SAND_DARK,
@@ -83,6 +84,36 @@ def _col(idx: int) -> tuple:
     return PYXEL_PALETTE[idx]
 
 
+# --- Background removal helpers ---
+_KARL_BG_COLOR = (126, 32, 114)  # pyxel color 2 (dark purple)
+_SAND_BG_COLOR = np.array([237, 199, 176], dtype=float)
+_SAND_BG_TOLERANCE = 20.0
+
+
+def _remove_color_key(img: PILImage.Image, color: tuple[int, int, int]) -> PILImage.Image:
+    """Replace exact RGB color with transparency."""
+    img = img.convert("RGBA")
+    arr = np.array(img)
+    mask = (arr[:, :, 0] == color[0]) & (arr[:, :, 1] == color[1]) & (arr[:, :, 2] == color[2])
+    arr[mask, 3] = 0
+    return PILImage.fromarray(arr)
+
+
+def _remove_sand_background(img: PILImage.Image) -> PILImage.Image:
+    """Replace sand-colored pixels with transparency."""
+    img = img.convert("RGBA")
+    arr = np.array(img).astype(float)
+    dist = np.sqrt(np.sum((arr[:, :, :3] - _SAND_BG_COLOR) ** 2, axis=2))
+    mask = dist < _SAND_BG_TOLERANCE
+    out = np.array(img)
+    out[mask, 3] = 0
+    return PILImage.fromarray(out)
+
+
+def _pil_to_texture(img: PILImage.Image, name: str) -> arcade.Texture:
+    return arcade.Texture(img, hash=name)
+
+
 # --- Sprite sheet caches ---
 _env_textures: dict[int, arcade.Texture] | None = None
 _char_textures: list[arcade.Texture] | None = None
@@ -113,23 +144,27 @@ def _load_char_textures():
     global _char_textures
     if _char_textures is not None:
         return
-    sheet = arcade.SpriteSheet(str(_PROJECT_ROOT / "assets" / "sprites" / "karl_sprites.png"))
+    src = PILImage.open(str(_PROJECT_ROOT / "assets" / "sprites" / "karl_sprites.png"))
     _char_textures = []
     for i in range(8):
-        _char_textures.append(sheet.get_texture(LBWH(i * 32, 64, 32, 32)))
+        crop = src.crop((i * 32, 64, i * 32 + 32, 96))
+        clean = _remove_color_key(crop, _KARL_BG_COLOR)
+        _char_textures.append(_pil_to_texture(clean, f"karl_{i}"))
 
 
 def _load_plant_textures():
     global _plant_textures, _plant_eaten_textures
     if _plant_textures is not None:
         return
-    sheet = arcade.SpriteSheet(str(_PROJECT_ROOT / "assets" / "sprites" / "also_without_berries.png"))
+    src = PILImage.open(str(_PROJECT_ROOT / "assets" / "sprites" / "also_without_berries.png")).convert("RGBA")
     _plant_textures = {}
     _plant_eaten_textures = {}
     plant_x = {"palm_tree": 96, "cactus": 64, "bush_berry": 32}
     for kind, sx in plant_x.items():
-        _plant_textures[kind] = sheet.get_texture(LBWH(sx, 32, 32, 32))
-        _plant_eaten_textures[kind] = sheet.get_texture(LBWH(sx + 96, 32, 32, 32))
+        crop = src.crop((sx, 32, sx + 32, 64))
+        _plant_textures[kind] = _pil_to_texture(_remove_sand_background(crop), f"plant_{kind}")
+        crop_e = src.crop((sx + 96, 32, sx + 128, 64))
+        _plant_eaten_textures[kind] = _pil_to_texture(_remove_sand_background(crop_e), f"plant_{kind}_eaten")
 
 
 def _load_dark_textures():
@@ -179,6 +214,13 @@ def _load_dark_textures():
                 _dark_textures[f"{name}_flip"] = tex.flip_left_right()
             except Exception:
                 pass
+    # Split wings into left/right halves for spread rendering
+    if "wings" in _dark_textures:
+        wings_img = PILImage.open(str(dark_assets / "boss" / "wings.png")).convert("RGBA")
+        w = wings_img.width
+        h = wings_img.height
+        _dark_textures["wings_left"] = _pil_to_texture(wings_img.crop((0, 0, w // 2, h)), "wings_left")
+        _dark_textures["wings_right"] = _pil_to_texture(wings_img.crop((w // 2, 0, w, h)), "wings_right")
 
 
 def _ensure_all_textures():
@@ -743,13 +785,18 @@ def view_dark_play(model: Model):
             bx -= arm_sway
         elif name == "arms_right":
             bx += arm_sway
-        sprite_key = _BOSS_SPRITE_KEYS.get(name)
-        if sprite_key and _dark_textures and sprite_key in _dark_textures:
-            tex = _dark_textures[sprite_key]
-            flip_h = name == "arms_right"
-            _blt_scaled(bx, by, tex, bw, bh, flip_h=flip_h)
+        if name == "wings" and _dark_textures and "wings_left" in _dark_textures:
+            half_w = _dark_textures["wings_left"].width
+            _blt_scaled(bx, by, _dark_textures["wings_left"], half_w, bh)
+            _blt_scaled(bx + bw - half_w, by, _dark_textures["wings_right"], half_w, bh)
         else:
-            _rect(bx, by, bw, bh, 8)
+            sprite_key = _BOSS_SPRITE_KEYS.get(name)
+            if sprite_key and _dark_textures and sprite_key in _dark_textures:
+                tex = _dark_textures[sprite_key]
+                flip_h = name == "arms_right"
+                _blt_scaled(bx, by, tex, bw, bh, flip_h=flip_h)
+            else:
+                _rect(bx, by, bw, bh, 8)
 
     # Draw projectiles
     for proj in dw.projectiles:
