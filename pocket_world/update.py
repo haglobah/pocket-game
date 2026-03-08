@@ -98,6 +98,16 @@ def _find_spawn(tilemap: tuple[tuple[int, ...], ...]) -> Point:
     return Point(cx, cy)
 
 
+def _find_wise_man_spot(tilemap: tuple[tuple[int, ...], ...], spawn: Point) -> Point:
+    """Place the wise man on a walkable tile adjacent to spawn."""
+    # Prefer right, then left, then vertical, then diagonals.
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (1, -1), (-1, -1)):
+        nx, ny = spawn.x + dx, spawn.y + dy
+        if 0 <= nx < MAP_W and 0 <= ny < MAP_H and is_walkable(tilemap[ny][nx]):
+            return Point(nx, ny)
+    return spawn
+
+
 def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
     player = model.player
     map_ = model.map
@@ -222,9 +232,10 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
 
         case MapGenerated(tilemap=tm, seed=s):
             spawn = _find_spawn(tm)
+            wise_man = _find_wise_man_spot(tm, spawn)
             return replace(model,
                 player=replace(player, pos=spawn, hydration=HYDRATION_START, hunger=HUNGER_START),
-                map=Map(tilemap=tm, seed=s),
+                map=Map(tilemap=tm, seed=s, spawn=spawn, wise_man=wise_man),
                 cycle=replace(cycle, death_reason="", death_timer=0, rewind_timer=0, learned=()),
                 game=replace(game,
                     state="play",

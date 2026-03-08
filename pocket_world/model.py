@@ -36,6 +36,8 @@ class Player:
 class Map:
     tilemap: tuple[tuple[int, ...], ...]
     seed: int
+    spawn: Point
+    wise_man: Point
 
 
 @dataclass(frozen=True)
@@ -81,6 +83,8 @@ def init() -> tuple[Model, list]:
         map=Map(
             tilemap=(),
             seed=0,
+            spawn=Point(MAP_W // 2, MAP_H // 2),
+            wise_man=Point(MAP_W // 2 + 1, MAP_H // 2),
         ),
         cycle=Cycle(
             number=1,

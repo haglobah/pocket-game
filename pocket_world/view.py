@@ -290,6 +290,17 @@ def draw_character(sx: int, sy: int, facing, frame: int):
     pyxel.blt(sx, sy, 0, u, 64, 32, 32, 2)  # colkey=2 for transparency
 
 
+def draw_wise_man(sx: int, sy: int, facing):
+    """Draw a 16x32 wise-man sprite; white background is transparent via colkey=7."""
+    if facing == LEFT:
+        u = 16
+    elif facing == RIGHT:
+        u = 32
+    else:
+        u = 0
+    pyxel.blt(sx, sy, 2, u, 128, 16, 32, 7)
+
+
 def view(model: Model):
     if model.game.state == "title":
         view_title(model)
@@ -542,6 +553,19 @@ def view_play(model: Model):
                 pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 1)
             else:
                 draw_tile(sx * TILE_SIZE, sy * TILE_SIZE, tile, model.game.frame)
+
+    # Draw wise man in world space at his spawn-adjacent tile.
+    wise = model.map.wise_man
+    if cam_x <= wise.x < cam_x + VIEWPORT_W and cam_y <= wise.y < cam_y + VIEWPORT_H:
+        wise_sx = (wise.x - cam_x) * TILE_SIZE + (TILE_SIZE - 16) // 2
+        wise_sy = (wise.y - cam_y) * TILE_SIZE
+        if px < wise.x:
+            wise_facing = LEFT
+        elif px > wise.x:
+            wise_facing = RIGHT
+        else:
+            wise_facing = DOWN
+        draw_wise_man(wise_sx, wise_sy, wise_facing)
 
     # Draw player at center of screen
     pcx = (VIEWPORT_W // 2) * TILE_SIZE

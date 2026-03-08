@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^/nixos/home/caspar/old-popos-partition/usb3/code/computergames/wanderersatz-game-jam/pocket-game/\\.venv/bin/python pocket_world\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
