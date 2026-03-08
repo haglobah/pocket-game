@@ -84,6 +84,20 @@ THOUGHT_READ_FRAMES = 180  # hold full text for 3 seconds
 THOUGHT_COOLDOWN_FRAMES = 600  # 10 seconds between thoughts
 THOUGHT_INITIAL_DELAY = 180  # 3 seconds before first thought after spawn
 
+# Wise-man idle dialogue bubbles
+WISE_DIALOG_CHAR_SPEED = 2
+WISE_DIALOG_READ_FRAMES = 210
+WISE_DIALOG_COOLDOWN_FRAMES = 420
+WISE_DIALOG_INITIAL_DELAY = 120
+WISE_IDLE_LINES = (
+    "Ah, another traveler waking in the dunes.",
+    "Drink when you can. The sand is patient.",
+    "Hold your breath for land. Let gills guide the deep.",
+    "The world loops, but your learning stays.",
+    "If you panic, count your breaths, then walk.",
+    "Berries and cactus can buy you one more dawn.",
+)
+
 # Directions
 UP = Point(0, -1)
 DOWN = Point(0, 1)

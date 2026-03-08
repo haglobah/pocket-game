@@ -21,6 +21,13 @@ class ThoughtBubble:
 
 
 @dataclass(frozen=True)
+class NpcDialogueBubble:
+    text: str
+    timer: int
+    duration: int
+
+
+@dataclass(frozen=True)
 class Player:
     pos: Point
     facing: Point
@@ -55,8 +62,11 @@ class Game:
     seed_input: str
     frame: int
     thought: ThoughtBubble | None
+    wise_dialogue: NpcDialogueBubble | None
     seen_memories: tuple[str, ...]
     thought_cooldown: int
+    wise_dialogue_cooldown: int
+    wise_dialogue_index: int
     show_minimap: bool
 
 
@@ -98,8 +108,11 @@ def init() -> tuple[Model, list]:
             seed_input="",
             frame=0,
             thought=None,
+            wise_dialogue=None,
             seen_memories=(),
             thought_cooldown=0,
+            wise_dialogue_cooldown=0,
+            wise_dialogue_index=0,
             show_minimap=False,
         ),
     )

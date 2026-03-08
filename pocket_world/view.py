@@ -46,6 +46,7 @@ from .constants import (
     DEATH_SCREEN_MIN_FRAMES,
     REWIND_DURATION,
     THOUGHT_CHAR_SPEED,
+    WISE_DIALOG_CHAR_SPEED,
 )
 from .model import Model, ThoughtBubble
 
@@ -494,6 +495,54 @@ def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
         ty += line_h
 
 
+def _draw_dialogue_bubble(cx: int, bottom_y: int, text: str, timer: int):
+    """Draw a speech bubble for NPC dialogue, using thought-bubble typography."""
+    chars_shown = min(len(text), timer // WISE_DIALOG_CHAR_SPEED)
+    display_text = text[:chars_shown]
+    if not display_text:
+        return
+
+    thought_font = _get_thought_font()
+    max_text_w = 260
+    lines = _wrap_text_by_width(display_text, max_text_w, thought_font)
+    fh = _THOUGHT_FONT_SIZE if thought_font else pyxel.FONT_HEIGHT
+    line_h = fh + 4
+
+    text_w = max(_measure_text_width(line, thought_font) for line in lines)
+    text_h = len(lines) * line_h - 2
+
+    pad_x, pad_y = 8, 6
+    bw = text_w + pad_x * 2
+    bh = text_h + pad_y * 2
+    bx = cx - bw // 2
+    by = bottom_y - bh - 16
+
+    bx = max(2, min(bx, SCREEN_W - bw - 2))
+
+    pyxel.rect(bx + 2, by + 1, bw - 4, bh - 2, 7)
+    pyxel.rect(bx + 1, by + 2, bw - 2, bh - 4, 7)
+    pyxel.line(bx + 2, by, bx + bw - 3, by, 5)
+    pyxel.line(bx + 2, by + bh - 1, bx + bw - 3, by + bh - 1, 5)
+    pyxel.line(bx, by + 2, bx, by + bh - 3, 5)
+    pyxel.line(bx + bw - 1, by + 2, bx + bw - 1, by + bh - 3, 5)
+    pyxel.pset(bx + 1, by + 1, 5)
+    pyxel.pset(bx + bw - 2, by + 1, 5)
+    pyxel.pset(bx + 1, by + bh - 2, 5)
+    pyxel.pset(bx + bw - 2, by + bh - 2, 5)
+
+    # Speech-tail triangle toward the wizard.
+    tail_x = max(bx + 8, min(cx, bx + bw - 8))
+    pyxel.tri(tail_x - 4, by + bh - 1, tail_x + 4, by + bh - 1, tail_x, by + bh + 8, 7)
+    pyxel.line(tail_x - 4, by + bh - 1, tail_x, by + bh + 8, 5)
+    pyxel.line(tail_x + 4, by + bh - 1, tail_x, by + bh + 8, 5)
+
+    ty = by + pad_y
+    for line in lines:
+        lx = bx + pad_x
+        pyxel.text(lx, ty, line, 1, thought_font)
+        ty += line_h
+
+
 def _ensure_minimap(model: Model):
     """Write minimap to image bank 2 if not already cached for this seed."""
     global _minimap_cache_seed
@@ -566,6 +615,15 @@ def view_play(model: Model):
         else:
             wise_facing = DOWN
         draw_wise_man(wise_sx, wise_sy, wise_facing)
+        if model.game.wise_dialogue is not None:
+            wise_cx = wise_sx + 8
+            wise_top = wise_sy
+            _draw_dialogue_bubble(
+                wise_cx,
+                wise_top - 6,
+                model.game.wise_dialogue.text,
+                model.game.wise_dialogue.timer,
+            )
 
     # Draw player at center of screen
     pcx = (VIEWPORT_W // 2) * TILE_SIZE

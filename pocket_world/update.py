@@ -23,6 +23,11 @@ from .constants import (
     THOUGHT_READ_FRAMES,
     THOUGHT_COOLDOWN_FRAMES,
     THOUGHT_INITIAL_DELAY,
+    WISE_DIALOG_CHAR_SPEED,
+    WISE_DIALOG_READ_FRAMES,
+    WISE_DIALOG_COOLDOWN_FRAMES,
+    WISE_DIALOG_INITIAL_DELAY,
+    WISE_IDLE_LINES,
     HYDRATION_MAX,
     HYDRATION_REFILL,
     HYDRATION_DEPLETION,
@@ -36,7 +41,7 @@ from .constants import (
     is_walkable,
     is_swimmable,
 )
-from .model import Model, Map, ThoughtBubble
+from .model import Model, Map, ThoughtBubble, NpcDialogueBubble
 from .messages import (
     Msg,
     Tick,
@@ -123,8 +128,11 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 ), []
             new_o2 = player.o2
             new_thought = game.thought
+            new_wise_dialogue = game.wise_dialogue
             new_seen = game.seen_memories
             new_cooldown = game.thought_cooldown
+            new_wise_dialogue_cooldown = game.wise_dialogue_cooldown
+            new_wise_dialogue_index = game.wise_dialogue_index
             cmds: list[Cmd] = []
             if game.state == "play" and map_.tilemap:
                 underwater = is_swimmable(map_.tilemap[player.pos.y][player.pos.x])
@@ -175,6 +183,22 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                         )
                         cmds.append(PlayThoughtSound())
 
+                # Wise-man idle dialogue management
+                new_wise_dialogue_cooldown = max(0, new_wise_dialogue_cooldown - 1)
+                if new_wise_dialogue is not None:
+                    new_timer = new_wise_dialogue.timer + 1
+                    if new_timer >= new_wise_dialogue.duration:
+                        new_wise_dialogue = None
+                        new_wise_dialogue_cooldown = WISE_DIALOG_COOLDOWN_FRAMES
+                    else:
+                        new_wise_dialogue = replace(new_wise_dialogue, timer=new_timer)
+                elif new_wise_dialogue_cooldown == 0 and WISE_IDLE_LINES:
+                    text = WISE_IDLE_LINES[new_wise_dialogue_index % len(WISE_IDLE_LINES)]
+                    duration = len(text) * WISE_DIALOG_CHAR_SPEED + WISE_DIALOG_READ_FRAMES
+                    new_wise_dialogue = NpcDialogueBubble(text=text, timer=0, duration=duration)
+                    new_wise_dialogue_index = (new_wise_dialogue_index + 1) % len(WISE_IDLE_LINES)
+                    cmds.append(PlayThoughtSound())
+
             # Deplete hydration and hunger
             new_hydration = max(0, player.hydration - HYDRATION_DEPLETION)
             new_hunger = max(0, player.hunger - HUNGER_DEPLETION)
@@ -201,8 +225,11 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 game=replace(game,
                     frame=game.frame + 1,
                     thought=new_thought,
+                    wise_dialogue=new_wise_dialogue,
                     seen_memories=new_seen,
                     thought_cooldown=new_cooldown,
+                    wise_dialogue_cooldown=new_wise_dialogue_cooldown,
+                    wise_dialogue_index=new_wise_dialogue_index,
                 ),
             ), cmds
 
@@ -241,6 +268,9 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     state="play",
                     thought=None,
                     thought_cooldown=THOUGHT_INITIAL_DELAY,
+                    wise_dialogue=None,
+                    wise_dialogue_cooldown=WISE_DIALOG_INITIAL_DELAY,
+                    wise_dialogue_index=0,
                 ),
             ), []
 
