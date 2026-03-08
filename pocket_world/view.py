@@ -61,6 +61,8 @@ from .model import Model, PlantObject, ThoughtBubble, NpcDialogueBubble
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+arcade.load_font(str(_PROJECT_ROOT / "assets" / "fonts" / "pixel_operator" / "PixelOperatorSC.ttf"))
+
 # --- Pyxel 16-color palette mapped to RGBA ---
 PYXEL_PALETTE = [
     (0, 0, 0, 255),               # 0  black
@@ -297,7 +299,7 @@ def _pset(x: int, y: int, col_idx: int):
 
 def _text(x: int, y: int, text_str: str, col_idx: int, font_size: int = 10):
     color = _col(col_idx)
-    arcade.draw_text(text_str, x, _ay(y), color, font_size, anchor_y="top") # , font_name="Press Start 2P"
+    arcade.draw_text(text_str, x, _ay(y), color, font_size, anchor_y="top", font_name="Pixel Operator SC")
 
 
 def _text_width(text_str: str, font_size: int = 10) -> int:
