@@ -12,7 +12,8 @@
 19 - land
 ### Death Sounds
 23 - Drowning
-24 - Hydration
+24 - Suffocating
+25 - Dehydration
 25 - Starvation
 26 - Killed by Enemy
 ### Interactions
