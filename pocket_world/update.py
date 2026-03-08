@@ -30,6 +30,8 @@ from .constants import (
     WISE_DIALOG_INITIAL_DELAY,
     WISE_IDLE_LINES,
     WISE_TALK_DISTANCE,
+    WISE_SPAWN_MIN_DISTANCE,
+    WISE_SPAWN_MAX_DISTANCE,
     WISE_FOLLOW_STEP_FRAMES,
     WISE_ATTACK_SHOT_SPEED,
     WISE_ATTACK_SHOT_TTL,
@@ -204,12 +206,27 @@ def _find_spawn(tilemap: tuple[tuple[int, ...], ...]) -> Point:
 
 
 def _find_wise_man_spot(tilemap: tuple[tuple[int, ...], ...], spawn: Point) -> Point:
-    """Place the wise man on a walkable tile adjacent to spawn."""
-    # Prefer right, then left, then vertical, then diagonals.
-    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (1, -1), (-1, -1)):
-        nx, ny = spawn.x + dx, spawn.y + dy
-        if 0 <= nx < MAP_W and 0 <= ny < MAP_H and is_walkable(tilemap[ny][nx]):
-            return Point(nx, ny)
+    """Place the wise man on a walkable tile farther from spawn."""
+    max_r = min(max(MAP_W, MAP_H), WISE_SPAWN_MAX_DISTANCE)
+    min_r = max(1, WISE_SPAWN_MIN_DISTANCE)
+
+    # Search outward in distance bands, checking edge tiles first.
+    for r in range(min_r, max_r + 1):
+        for dx in range(-r, r + 1):
+            for dy in range(-r, r + 1):
+                if max(abs(dx), abs(dy)) != r:
+                    continue
+                nx, ny = spawn.x + dx, spawn.y + dy
+                if 0 <= nx < MAP_W and 0 <= ny < MAP_H and is_walkable(tilemap[ny][nx]):
+                    return Point(nx, ny)
+
+    # Fallback: nearest walkable tile to spawn.
+    for r in range(1, max(MAP_W, MAP_H)):
+        for dx in range(-r, r + 1):
+            for dy in range(-r, r + 1):
+                nx, ny = spawn.x + dx, spawn.y + dy
+                if 0 <= nx < MAP_W and 0 <= ny < MAP_H and is_walkable(tilemap[ny][nx]):
+                    return Point(nx, ny)
     return spawn
 
 
