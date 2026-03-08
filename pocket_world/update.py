@@ -32,6 +32,8 @@ from .constants import (
     HUNGER_REFILL,
     HUNGER_DEPLETION,
     DRINK_TILES,
+    POISON_DURATION,
+    POISON_O2_DRAIN,
     is_walkable,
     is_swimmable,
 )
@@ -84,6 +86,22 @@ def _adjacent_tiles(pos: Point, tilemap: tuple[tuple[int, ...], ...]) -> list[in
     return tiles
 
 
+def _is_poison_water(pos: Point, map_: Map) -> bool:
+    """Check if the player is standing on or adjacent to poisonous water."""
+    positions = (
+        pos,
+        Point(pos.x, pos.y - 1),
+        Point(pos.x, pos.y + 1),
+        Point(pos.x - 1, pos.y),
+        Point(pos.x + 1, pos.y),
+    )
+    for p in positions:
+        if 0 <= p.x < MAP_W and 0 <= p.y < MAP_H:
+            if map_.tilemap[p.y][p.x] in DRINK_TILES and p in map_.poison_water:
+                return True
+    return False
+
+
 def _find_nearby_food(objects: tuple[PlantObject, ...], pos: Point) -> int | None:
     """Return index of an adjacent or standing PlantObject with has_fruit=True, or None."""
     positions = frozenset((
@@ -128,6 +146,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     game=replace(game, frame=game.frame + 1),
                 ), []
             new_o2 = player.o2
+            new_poison = player.poison_timer
             new_thought = game.thought
             new_seen = game.seen_memories
             new_cooldown = game.thought_cooldown
@@ -142,16 +161,22 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     new_o2 = max(0, new_o2 - O2_LUNGS_UNDERWATER_CHUNK)
                 else:
                     new_o2 = max(0, new_o2 - 1)
+                # Poison drain: suffocate over 10 seconds
+                new_poison = max(0, player.poison_timer - 1) if player.poison_timer > 0 else 0
+                if new_poison > 0:
+                    new_o2 = max(0, new_o2 - POISON_O2_DRAIN)
                 # Check for O2 death
                 if new_o2 <= 0:
-                    if player.breathing_mode == LUNGS and underwater:
+                    if new_poison > 0 or (player.poison_timer > 0 and new_poison == 0):
+                        reason = "Suffocated from poisoned water"
+                    elif player.breathing_mode == LUNGS and underwater:
                         reason = "Drowned (lungs underwater)"
                     elif player.breathing_mode == GILLS:
                         reason = "Suffocated (gills ran dry)"
                     else:
                         reason = "Ran out of oxygen"
                     return replace(model,
-                        player=replace(player, o2=0),
+                        player=replace(player, o2=O2_MAX, poison_timer=0),
                         cycle=replace(cycle, death_reason=reason, death_timer=0),
                         game=replace(game, frame=game.frame + 1, state="dead"),
                     ), []
@@ -187,13 +212,13 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             if game.state == "play":
                 if new_hydration <= 0:
                     return replace(model,
-                        player=replace(player, o2=new_o2, hydration=0, hunger=new_hunger),
+                        player=replace(player, o2=new_o2, hydration=0, hunger=new_hunger, poison_timer=new_poison),
                         cycle=replace(cycle, death_reason="Died of dehydration", death_timer=0),
                         game=replace(game, frame=game.frame + 1, state="dead"),
                     ), []
                 if new_hunger <= 0:
                     return replace(model,
-                        player=replace(player, o2=new_o2, hydration=new_hydration, hunger=0),
+                        player=replace(player, o2=new_o2, hydration=new_hydration, hunger=0, poison_timer=new_poison),
                         cycle=replace(cycle, death_reason="Died of starvation", death_timer=0),
                         game=replace(game, frame=game.frame + 1, state="dead"),
                     ), []
@@ -203,6 +228,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                     o2=new_o2,
                     hydration=new_hydration,
                     hunger=new_hunger,
+                    poison_timer=new_poison,
                 ),
                 game=replace(game,
                     frame=game.frame + 1,
@@ -239,11 +265,11 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
         case StartGame(seed=s):
             return model, [GenerateMap(seed=s)]
 
-        case MapGenerated(tilemap=tm, seed=s, objects=objs):
+        case MapGenerated(tilemap=tm, seed=s, objects=objs, poison_water=pw):
             spawn = _find_spawn(tm, objs)
             return replace(model,
-                player=replace(player, pos=spawn, hydration=HYDRATION_START, hunger=HUNGER_START),
-                map=Map(tilemap=tm, seed=s, objects=objs),
+                player=replace(player, pos=spawn, hydration=HYDRATION_START, hunger=HUNGER_START, poison_timer=0),
+                map=Map(tilemap=tm, seed=s, objects=objs, poison_water=pw),
                 cycle=replace(cycle, death_reason="", death_timer=0, rewind_timer=0, learned=()),
                 game=replace(game,
                     state="play",
@@ -288,9 +314,12 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
             nearby = _adjacent_tiles(player.pos, map_.tilemap)
             standing = map_.tilemap[player.pos.y][player.pos.x]
             if standing in DRINK_TILES or any(t in DRINK_TILES for t in nearby):
+                # Check if drinking from poisonous water
+                is_poison = _is_poison_water(player.pos, map_)
                 new_hydration = min(HYDRATION_MAX, player.hydration + HYDRATION_REFILL)
+                new_poison_timer = POISON_DURATION if is_poison else player.poison_timer
                 return replace(model,
-                    player=replace(player, hydration=new_hydration),
+                    player=replace(player, hydration=new_hydration, poison_timer=new_poison_timer),
                     cycle=replace(cycle, learned=_add_learned(cycle, "drinking water")),
                 ), []
             return model, []
