@@ -289,7 +289,7 @@ def draw_plant(sx: int, sy: int, obj: PlantObject):
         pyxel.blt(sx, sy, 1, sprite_x, 32, 32, 32)
     else:
         # Eaten state: same x, but from without_berries.png loaded at y=128
-        pyxel.blt(sx, sy, 1, sprite_x, 128 + 32, 32, 32)
+        pyxel.blt(sx, sy, 1, sprite_x + 96, 32, 32, 32)
 
 
 def draw_character(sx: int, sy: int, facing, frame: int):

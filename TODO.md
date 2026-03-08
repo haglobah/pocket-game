@@ -1,4 +1,8 @@
 
+# Fixes
+
+- [ ] Without berries are once removed
+
 # Story & World Overview
 
 - Style: minimal "show don't tell", mysterious hostile natural world scifi, caveman-in-scifi-world vibe
