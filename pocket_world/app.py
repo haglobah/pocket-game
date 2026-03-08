@@ -158,10 +158,10 @@ class App:
         )
         pyxel.images[0].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "karl_sprites.png"))
         pyxel.images[1].load(0, 0, str(_PROJECT_ROOT / "assets" / "sprites" / "environment_sprites.png"))
-        # Bank 2 is used for the minimap in y=0..124; keep wise-man sprites below that.
-        pyxel.images[2].load(0, 128, str(_PROJECT_ROOT / "assets" / "sprites" / "wise-man-front.png"))
-        pyxel.images[2].load(16, 128, str(_PROJECT_ROOT / "assets" / "sprites" / "wise-man-left.png"))
-        pyxel.images[2].load(32, 128, str(_PROJECT_ROOT / "assets" / "sprites" / "wise-man-right.png"))
+        # Keep wise-man sprites in bank 1 to avoid overlap with dark-world sprites in bank 2.
+        pyxel.images[1].load(0, 128, str(_PROJECT_ROOT / "assets" / "sprites" / "wise-man-front.png"))
+        pyxel.images[1].load(16, 128, str(_PROJECT_ROOT / "assets" / "sprites" / "wise-man-left.png"))
+        pyxel.images[1].load(32, 128, str(_PROJECT_ROOT / "assets" / "sprites" / "wise-man-right.png"))
         # Preload dark sprites used by dark pocket world encounters.
         _load_dark_sprites()
         define_sounds()

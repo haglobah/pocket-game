@@ -340,7 +340,7 @@ def draw_wise_man(sx: int, sy: int, facing):
         u = 32
     else:
         u = 0
-    pyxel.blt(sx, sy, 2, u, 128, 16, 32, 7)
+    pyxel.blt(sx, sy, 1, u, 128, 16, 32, 7)
 
 
 def view(model: Model):
