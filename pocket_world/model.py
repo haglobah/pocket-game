@@ -33,9 +33,23 @@ class Player:
 
 
 @dataclass(frozen=True)
+class PlantObject:
+    anchor: Point       # map position (blocks movement)
+    kind: str           # "palm_tree" | "cactus" | "bush_berry"
+    has_fruit: bool     # True = edible, False = already eaten
+
+
+@dataclass(frozen=True)
 class Map:
     tilemap: tuple[tuple[int, ...], ...]
     seed: int
+    objects: tuple[PlantObject, ...]
+
+    def __post_init__(self):
+        object.__setattr__(self, '_anchor_set', frozenset(obj.anchor for obj in self.objects))
+
+    def has_object_at(self, pos: Point) -> bool:
+        return pos in self._anchor_set
 
 
 @dataclass(frozen=True)
@@ -81,6 +95,7 @@ def init() -> tuple[Model, list]:
         map=Map(
             tilemap=(),
             seed=0,
+            objects=(),
         ),
         cycle=Cycle(
             number=1,

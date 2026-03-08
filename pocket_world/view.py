@@ -47,7 +47,7 @@ from .constants import (
     REWIND_DURATION,
     THOUGHT_CHAR_SPEED,
 )
-from .model import Model, ThoughtBubble
+from .model import Model, PlantObject, ThoughtBubble
 
 
 _TITLE_FONT = None
@@ -273,6 +273,25 @@ def draw_tile(sx: int, sy: int, tile: int, frame: int):
         # pyxel.circ(sx + 19, sy + 21, 2, 8)
 
 
+# Sprite x-offsets for plant kinds in the environment sprite sheet
+_PLANT_SPRITE_X = {
+    "palm_tree": 96,
+    "cactus": 64,
+    "bush_berry": 32,
+}
+
+
+def draw_plant(sx: int, sy: int, obj: PlantObject):
+    """Draw a plant object at screen pixel position (sx, sy)."""
+    sprite_x = _PLANT_SPRITE_X[obj.kind]
+    if obj.has_fruit:
+        # Row at y=32 in environment_sprites.png (bank 1, y=32)
+        pyxel.blt(sx, sy, 1, sprite_x, 32, 32, 32)
+    else:
+        # Eaten state: same x, but from without_berries.png loaded at y=128
+        pyxel.blt(sx, sy, 1, sprite_x, 128 + 32, 32, 32)
+
+
 def draw_character(sx: int, sy: int, facing, frame: int):
     """Draw a creature sprite at screen pixel position (32x32), using sprites."""
     walk_bob = (frame // 6) % 2
@@ -483,6 +502,13 @@ def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
         ty += line_h
 
 
+_PLANT_MINIMAP_COLORS = {
+    "palm_tree": 11,
+    "cactus": 3,
+    "bush_berry": 8,
+}
+
+
 def _ensure_minimap(model: Model):
     """Write minimap to image bank 2 if not already cached for this seed."""
     global _minimap_cache_seed
@@ -495,6 +521,12 @@ def _ensure_minimap(model: Model):
             tx = mx * MINIMAP_SCALE
             tile = model.map.tilemap[ty][tx]
             img.pset(mx, my, _MINIMAP_COLORS.get(tile, 0))
+    # Overlay plant objects on minimap
+    for obj in model.map.objects:
+        mx = obj.anchor.x // MINIMAP_SCALE
+        my = obj.anchor.y // MINIMAP_SCALE
+        if 0 <= mx < MINIMAP_W and 0 <= my < MINIMAP_H:
+            img.pset(mx, my, _PLANT_MINIMAP_COLORS.get(obj.kind, 0))
     _minimap_cache_seed = model.map.seed
 
 
@@ -542,6 +574,13 @@ def view_play(model: Model):
                 pyxel.rect(sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE, 1)
             else:
                 draw_tile(sx * TILE_SIZE, sy * TILE_SIZE, tile, model.game.frame)
+
+    # Draw plant objects visible in the viewport
+    for obj in model.map.objects:
+        ox = obj.anchor.x - cam_x
+        oy = obj.anchor.y - cam_y
+        if 0 <= ox < VIEWPORT_W and 0 <= oy < VIEWPORT_H:
+            draw_plant(ox * TILE_SIZE, oy * TILE_SIZE, obj)
 
     # Draw player at center of screen
     pcx = (VIEWPORT_W // 2) * TILE_SIZE

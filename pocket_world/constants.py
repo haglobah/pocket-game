@@ -36,7 +36,7 @@ BUSH = DEAD_BUSH
 
 
 def is_walkable(tile: int) -> bool:
-    return tile in (SAND, SAND_DARK, DEAD_BUSH, BUSH_GREEN, BUSH_FLOWERING, BUSH_BERRY)
+    return tile in (SAND, SAND_DARK, DEAD_BUSH, BUSH_GREEN, BUSH_FLOWERING)
 
 
 def is_swimmable(tile: int) -> bool:
@@ -66,8 +66,7 @@ HUNGER_START = 3 * 60 * 60  # 10 min at 60fps
 HUNGER_REFILL = 5 * 60 * 60  # 5 min per eat
 HUNGER_DEPLETION = 1  # frames lost per frame
 
-# Edible / drinkable tiles
-FOOD_TILES = (4, 5, 12)  # PALM_TREE, CACTUS, BUSH_BERRY
+# Drinkable tiles
 DRINK_TILES = (8, 9)  # WATER, WATER_DEEP
 
 # Death screen / rewind

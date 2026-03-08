@@ -31,12 +31,11 @@ from .constants import (
     HUNGER_MAX,
     HUNGER_REFILL,
     HUNGER_DEPLETION,
-    FOOD_TILES,
     DRINK_TILES,
     is_walkable,
     is_swimmable,
 )
-from .model import Model, Map, ThoughtBubble
+from .model import Model, Map, PlantObject, ThoughtBubble
 from .messages import (
     Msg,
     Tick,
@@ -85,16 +84,33 @@ def _adjacent_tiles(pos: Point, tilemap: tuple[tuple[int, ...], ...]) -> list[in
     return tiles
 
 
-def _find_spawn(tilemap: tuple[tuple[int, ...], ...]) -> Point:
+def _find_nearby_food(objects: tuple[PlantObject, ...], pos: Point) -> int | None:
+    """Return index of an adjacent or standing PlantObject with has_fruit=True, or None."""
+    positions = frozenset((
+        pos,
+        Point(pos.x, pos.y - 1),
+        Point(pos.x, pos.y + 1),
+        Point(pos.x - 1, pos.y),
+        Point(pos.x + 1, pos.y),
+    ))
+    for i, obj in enumerate(objects):
+        if obj.has_fruit and obj.anchor in positions:
+            return i
+    return None
+
+
+def _find_spawn(tilemap: tuple[tuple[int, ...], ...], objects: tuple[PlantObject, ...] = ()) -> Point:
     """Find a walkable spawn near center."""
+    anchor_set = frozenset(obj.anchor for obj in objects) if objects else frozenset()
     cx, cy = MAP_W // 2, MAP_H // 2
     for r in range(max(MAP_W, MAP_H)):
         for dx in range(-r, r + 1):
             for dy in range(-r, r + 1):
                 nx, ny = cx + dx, cy + dy
                 if 0 <= nx < MAP_W and 0 <= ny < MAP_H:
-                    if is_walkable(tilemap[ny][nx]):
-                        return Point(nx, ny)
+                    p = Point(nx, ny)
+                    if is_walkable(tilemap[ny][nx]) and p not in anchor_set:
+                        return p
     return Point(cx, cy)
 
 
@@ -203,6 +219,9 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 return replace(model, player=replace(player, facing=d)), []
             raw = Point(player.pos.x + d.x, player.pos.y + d.y)
             new_pos = Point(raw.x % MAP_W, raw.y % MAP_H)
+            # Block movement if an object anchor is at the target
+            if map_.has_object_at(new_pos):
+                return replace(model, player=replace(player, facing=d, move_timer=0)), []
             if is_walkable(map_.tilemap[new_pos.y][new_pos.x]):
                 delay = MOVE_DELAY_RUNNING if player.sprinting else MOVE_DELAY_LAND
                 skill = "sprinting" if player.sprinting else "walking on land"
@@ -220,11 +239,11 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
         case StartGame(seed=s):
             return model, [GenerateMap(seed=s)]
 
-        case MapGenerated(tilemap=tm, seed=s):
-            spawn = _find_spawn(tm)
+        case MapGenerated(tilemap=tm, seed=s, objects=objs):
+            spawn = _find_spawn(tm, objs)
             return replace(model,
                 player=replace(player, pos=spawn, hydration=HYDRATION_START, hunger=HUNGER_START),
-                map=Map(tilemap=tm, seed=s),
+                map=Map(tilemap=tm, seed=s, objects=objs),
                 cycle=replace(cycle, death_reason="", death_timer=0, rewind_timer=0, learned=()),
                 game=replace(game,
                     state="play",
@@ -279,12 +298,15 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
         case Eat():
             if game.state != "play" or not map_.tilemap:
                 return model, []
-            nearby = _adjacent_tiles(player.pos, map_.tilemap)
-            standing = map_.tilemap[player.pos.y][player.pos.x]
-            if standing in FOOD_TILES or any(t in FOOD_TILES for t in nearby):
+            food_idx = _find_nearby_food(map_.objects, player.pos)
+            if food_idx is not None:
                 new_hunger = min(HUNGER_MAX, player.hunger + HUNGER_REFILL)
+                # Mark the plant as eaten
+                eaten_obj = replace(map_.objects[food_idx], has_fruit=False)
+                new_objects = map_.objects[:food_idx] + (eaten_obj,) + map_.objects[food_idx + 1:]
                 return replace(model,
                     player=replace(player, hunger=new_hunger),
+                    map=replace(map_, objects=new_objects),
                     cycle=replace(cycle, learned=_add_learned(cycle, "eating plants")),
                 ), [PlayEatingSound()]
             return model, []
