@@ -146,6 +146,10 @@ class DarkWorld:
     minions: tuple[Minion, ...]
     projectiles: tuple[Projectile, ...]
     arena_tiles: tuple[tuple[int, ...], ...]
+    wizard_pos: Point | None = None
+    wizard_shots: tuple[WizardShot, ...] = ()
+    wizard_attack_cooldown: int = 0
+    wizard_follow_timer: int = 0
     tick: int = 0
 
 

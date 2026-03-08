@@ -888,6 +888,27 @@ def view_dark_play(model: Model):
             draw_w = -sw if m.facing.x >= 0 else sw
             pyxel.blt(mx, my, bank, su, sv, draw_w, sh, 0)
 
+    # Draw wizard companion when present.
+    if dw.wizard_pos is not None:
+        wise = dw.wizard_pos
+        wise_sx = (wise.x - cam_x) * TILE_SIZE + (TILE_SIZE - 16) // 2
+        wise_sy = (wise.y - cam_y) * TILE_SIZE
+        if px < wise.x:
+            wise_facing = LEFT
+        elif px > wise.x:
+            wise_facing = RIGHT
+        else:
+            wise_facing = DOWN
+        draw_wise_man(wise_sx, wise_sy, wise_facing)
+
+    # Friendly wizard projectiles.
+    for shot in dw.wizard_shots:
+        shot_sx = int((shot.x - cam_x) * TILE_SIZE)
+        shot_sy = int((shot.y - cam_y) * TILE_SIZE)
+        if 0 <= shot_sx < SCREEN_W and 0 <= shot_sy < VIEWPORT_H * TILE_SIZE:
+            pyxel.pset(shot_sx, shot_sy, 12)
+            pyxel.pset(shot_sx + 1, shot_sy, 7)
+
     # Draw player
     pcx = (VIEWPORT_W // 2) * TILE_SIZE
     pcy = (VIEWPORT_H // 2) * TILE_SIZE

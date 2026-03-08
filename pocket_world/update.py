@@ -40,6 +40,11 @@ from .constants import (
     WISE_ATTACK_SHOT_TTL,
     WISE_ATTACK_COOLDOWN_FRAMES,
     WISE_ATTACK_O2_DAMAGE,
+    WISE_HELP_SHOT_SPEED,
+    WISE_HELP_SHOT_TTL,
+    WISE_HELP_ATTACK_COOLDOWN_FRAMES,
+    WISE_HELP_DAMAGE,
+    WISE_HELP_TARGET_RANGE,
     HYDRATION_MAX,
     HYDRATION_REFILL,
     HYDRATION_DEPLETION,
@@ -180,6 +185,62 @@ def _spawn_wizard_shot(wise_pos: Point, player_pos: Point) -> WizardShot:
         vy=(dy / dist) * WISE_ATTACK_SHOT_SPEED,
         ttl=WISE_ATTACK_SHOT_TTL,
     )
+
+
+def _spawn_dark_wizard_shot(wise_pos: Point, target: Point) -> WizardShot:
+    """Create a helper shot from wizard tile-center toward target tile-center."""
+    start_x = wise_pos.x + 0.5
+    start_y = wise_pos.y + 0.5
+    target_x = target.x + 0.5
+    target_y = target.y + 0.5
+    dx = float(target_x - start_x)
+    dy = float(target_y - start_y)
+    dist = max(0.001, hypot(dx, dy))
+    return WizardShot(
+        x=start_x,
+        y=start_y,
+        vx=(dx / dist) * WISE_HELP_SHOT_SPEED,
+        vy=(dy / dist) * WISE_HELP_SHOT_SPEED,
+        ttl=WISE_HELP_SHOT_TTL,
+    )
+
+
+def _find_dark_wizard_spawn(tilemap: tuple[tuple[int, ...], ...], player_pos: Point) -> Point:
+    """Find a nearby walkable tile for wizard when entering dark world."""
+    offsets = (
+        (-1, 0), (1, 0), (0, -1), (0, 1),
+        (-1, -1), (1, -1), (-1, 1), (1, 1),
+        (-2, 0), (2, 0), (0, -2), (0, 2),
+    )
+    for dx, dy in offsets:
+        nx, ny = player_pos.x + dx, player_pos.y + dy
+        if 0 <= nx < MAP_W and 0 <= ny < MAP_H and is_walkable(tilemap[ny][nx]):
+            return Point(nx, ny)
+    return player_pos
+
+
+def _pick_dark_wizard_target(wise_pos: Point, boss_parts: tuple[BossPart, ...], minions: tuple[Minion, ...]) -> Point | None:
+    """Pick nearest enemy target for companion wizard."""
+    best_dist = float("inf")
+    best_target: Point | None = None
+    for m in minions:
+        if m.hp <= 0:
+            continue
+        d = hypot((m.pos.x + 0.5) - (wise_pos.x + 0.5), (m.pos.y + 0.5) - (wise_pos.y + 0.5))
+        if d < best_dist:
+            best_dist = d
+            best_target = m.pos
+    for part in boss_parts:
+        if part.hp <= 0:
+            continue
+        center = Point(part.pos.x + part.size.x // 2, part.pos.y + part.size.y // 2)
+        d = hypot((center.x + 0.5) - (wise_pos.x + 0.5), (center.y + 0.5) - (wise_pos.y + 0.5))
+        if d < best_dist:
+            best_dist = d
+            best_target = center
+    if best_target is None or best_dist > WISE_HELP_TARGET_RANGE:
+        return None
+    return best_target
 
 
 def _advance_wizard_shots(shots: tuple[WizardShot, ...], player_pos: Point) -> tuple[tuple[WizardShot, ...], int]:
@@ -699,6 +760,7 @@ def update(model: Model, msg: Msg) -> tuple[Model, list[Cmd]]:
                 minions=minions,
                 projectiles=(),
                 arena_tiles=model.map.tilemap,
+                wizard_pos=_find_dark_wizard_spawn(model.map.tilemap, player.pos) if game.wise_outcome == "follow" else None,
             )
             return replace(model,
                 player=replace(player, hp=PLAYER_MAX_HP, invincible_timer=0, punch_timer=0),
@@ -791,6 +853,10 @@ def _dark_tick(model: Model) -> tuple[Model, list[Cmd]]:
     new_fire_timer = boss.fire_timer - 1
     new_projectiles = list(dw.projectiles)
     new_tick = dw.tick + 1
+    new_wizard_pos = dw.wizard_pos
+    new_wizard_shots = list(dw.wizard_shots)
+    new_wizard_attack_cooldown = max(0, dw.wizard_attack_cooldown - 1)
+    new_wizard_follow_timer = dw.wizard_follow_timer + 1
 
     if new_fire_timer <= 0 and boss.phase == "active":
         head = next((p for p in boss.parts if p.name == "head" and p.hp > 0), None)
@@ -859,6 +925,76 @@ def _dark_tick(model: Model) -> tuple[Model, list[Cmd]]:
         else:
             new_minions.append(replace(m, move_timer=mt))
 
+    # --- Friendly wizard companion AI ---
+    if new_wizard_pos is not None:
+        if new_wizard_follow_timer >= WISE_FOLLOW_STEP_FRAMES:
+            new_wizard_pos = _pick_follower_tile(model.map.tilemap, new_wizard_pos, player.pos)
+            new_wizard_follow_timer = 0
+
+        target = _pick_dark_wizard_target(new_wizard_pos, boss.parts, tuple(new_minions))
+        if target is not None and new_wizard_attack_cooldown == 0:
+            new_wizard_shots.append(_spawn_dark_wizard_shot(new_wizard_pos, target))
+            new_wizard_attack_cooldown = WISE_HELP_ATTACK_COOLDOWN_FRAMES
+
+    # --- Friendly wizard shots: damage minions and boss parts ---
+    updated_wizard_shots: list[WizardShot] = []
+    minion_list = list(new_minions)
+    boss_parts = list(boss.parts)
+    for shot in new_wizard_shots:
+        nx = shot.x + shot.vx
+        ny = shot.y + shot.vy
+        ttl = shot.ttl - 1
+        if ttl <= 0:
+            continue
+
+        hit = False
+        for i, m in enumerate(minion_list):
+            if m.hp <= 0:
+                continue
+            if abs(nx - (m.pos.x + 0.5)) <= 0.55 and abs(ny - (m.pos.y + 0.5)) <= 0.55:
+                minion_list[i] = replace(m, hp=max(0, m.hp - WISE_HELP_DAMAGE))
+                hit = True
+                break
+
+        if not hit:
+            for i, part in enumerate(boss_parts):
+                if part.hp <= 0:
+                    continue
+                if (
+                    part.pos.x <= nx <= part.pos.x + part.size.x
+                    and part.pos.y <= ny <= part.pos.y + part.size.y
+                ):
+                    boss_parts[i] = replace(part, hp=max(0, part.hp - WISE_HELP_DAMAGE))
+                    hit = True
+                    break
+
+        if not hit:
+            updated_wizard_shots.append(replace(shot, x=nx, y=ny, ttl=ttl))
+
+    new_minions = [m for m in minion_list if m.hp > 0]
+    new_boss_parts = tuple(boss_parts)
+    alive_parts = [p for p in new_boss_parts if p.hp > 0]
+    if boss.phase == "active" and not alive_parts:
+        return replace(model,
+            player=replace(player,
+                hp=new_hp,
+                invincible_timer=new_invincible,
+                punch_timer=new_punch_timer,
+                move_timer=new_move_timer,
+            ),
+            dark_world=replace(dw,
+                boss=replace(boss, parts=new_boss_parts, phase="defeated", fire_timer=new_fire_timer),
+                minions=tuple(new_minions),
+                projectiles=tuple(updated_projectiles),
+                wizard_pos=new_wizard_pos,
+                wizard_shots=tuple(updated_wizard_shots),
+                wizard_attack_cooldown=new_wizard_attack_cooldown,
+                wizard_follow_timer=new_wizard_follow_timer,
+                tick=new_tick,
+            ),
+            game=replace(game, state="ending_b", frame=game.frame + 1),
+        ), cmds + [PlayVictorySound()]
+
     # --- Check death ---
     if new_hp <= 0:
         return replace(model,
@@ -867,11 +1003,15 @@ def _dark_tick(model: Model) -> tuple[Model, list[Cmd]]:
             game=replace(game, state="dead", frame=game.frame + 1),
         ), cmds
 
-    new_boss = replace(boss, fire_timer=new_fire_timer)
+    new_boss = replace(boss, fire_timer=new_fire_timer, parts=new_boss_parts)
     new_dw = replace(dw,
         boss=new_boss,
         minions=tuple(new_minions),
         projectiles=tuple(updated_projectiles),
+        wizard_pos=new_wizard_pos,
+        wizard_shots=tuple(updated_wizard_shots),
+        wizard_attack_cooldown=new_wizard_attack_cooldown,
+        wizard_follow_timer=new_wizard_follow_timer,
         tick=new_tick,
     )
     return replace(model,
