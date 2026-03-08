@@ -146,6 +146,33 @@ DARK_SPRITE_MAP = {
     "projectile_2": (2, 128, 224, 32, 32),
 }
 
+# Wise-man / wizard NPC
+WISE_DIALOG_CHAR_SPEED = 2  # frames per character (typing effect)
+WISE_DIALOG_READ_FRAMES = 210  # hold full text for ~3.5 seconds
+WISE_DIALOG_COOLDOWN_FRAMES = 360  # 6 seconds between idle lines
+WISE_DIALOG_INITIAL_DELAY = 300  # 5 seconds before first idle line
+WISE_IDLE_LINES = (
+    "The desert speaks in riddles...",
+    "I've seen many like you wander these sands.",
+    "Water hides more secrets than you think.",
+    "The portal stirs. Can you feel it?",
+    "Every cycle teaches something new.",
+    "Careful where you drink, traveller.",
+)
+WISE_TALK_DISTANCE = 3  # tiles — triggers dialogue
+WISE_SPAWN_MIN_DISTANCE = 10  # min tiles from player spawn
+WISE_SPAWN_MAX_DISTANCE = 18  # max tiles from player spawn
+WISE_FOLLOW_STEP_FRAMES = 12  # frames between follower steps
+WISE_ATTACK_SHOT_SPEED = 3.0  # pixels per frame (hostile bolts)
+WISE_ATTACK_SHOT_TTL = 240  # frames before bolt expires
+WISE_ATTACK_COOLDOWN_FRAMES = 24  # frames between hostile bolts
+WISE_ATTACK_O2_DAMAGE = 300  # O2 lost per bolt hit
+WISE_HELP_SHOT_SPEED = 0.55  # tiles per frame (companion bolts)
+WISE_HELP_SHOT_TTL = 120  # frames before companion bolt expires
+WISE_HELP_ATTACK_COOLDOWN_FRAMES = 20  # frames between companion bolts
+WISE_HELP_DAMAGE = 1  # damage per companion bolt hit
+WISE_HELP_TARGET_RANGE = 18  # tiles — max targeting range
+
 DIR_NAME = {
     UP: "UP",
     DOWN: "DOWN",

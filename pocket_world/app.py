@@ -24,6 +24,7 @@ from .messages import (
     Punch,
     DarkWorldGenerated,
     DismissCredits,
+    ChooseWizardOption,
 )
 from .commands import (
     Cmd, GenerateMap, PlayStepSound, PlaySwimSound, PlayThoughtSound, PlayEatingSound,
@@ -201,6 +202,10 @@ class App(arcade.Window):
                 msgs.append(Eat())
             if arcade.key.M in pressed:
                 msgs.append(ToggleMinimap())
+            if arcade.key.KEY_1 in pressed:
+                msgs.append(ChooseWizardOption(option=1))
+            if arcade.key.KEY_2 in pressed:
+                msgs.append(ChooseWizardOption(option=2))
             msgs.append(SetSprinting(active=arcade.key.C in held))
 
         elif self.model.game.state == "dark_play":

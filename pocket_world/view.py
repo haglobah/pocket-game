@@ -54,9 +54,10 @@ from .constants import (
     DEATH_SCREEN_MIN_FRAMES,
     REWIND_DURATION,
     THOUGHT_CHAR_SPEED,
+    WISE_DIALOG_CHAR_SPEED,
     _KARL_BG_COLOR,
 )
-from .model import Model, PlantObject, ThoughtBubble
+from .model import Model, PlantObject, ThoughtBubble, NpcDialogueBubble
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -104,6 +105,7 @@ _char_textures: list[arcade.Texture] | None = None
 _dark_textures: dict[str, arcade.Texture] | None = None
 _plant_textures: dict[str, arcade.Texture] | None = None
 _plant_eaten_textures: dict[str, arcade.Texture] | None = None
+_wise_man_textures: dict[str, arcade.Texture] | None = None
 
 
 def _load_env_textures():
@@ -147,6 +149,27 @@ def _load_plant_textures():
     for kind, sx in plant_x.items():
         _plant_textures[kind] = sheet.get_texture(LBWH(sx, 32, 32, 32))
         _plant_eaten_textures[kind] = sheet.get_texture(LBWH(sx + 96, 32, 32, 32))
+
+
+def _load_wise_man_textures():
+    global _wise_man_textures
+    if _wise_man_textures is not None:
+        return
+    sprites = _PROJECT_ROOT / "assets" / "sprites"
+    _wise_man_textures = {}
+    mapping = {
+        "front": "wise-man-front.png",
+        "left": "wise-man-left.png",
+        "right": "wise-man-right.png",
+    }
+    for key, filename in mapping.items():
+        path = str(sprites / filename)
+        try:
+            img = PILImage.open(path).convert("RGBA")
+            clean = _remove_color_key(img, (255, 255, 255))
+            _wise_man_textures[key] = _pil_to_texture(clean, f"wise_man_{key}")
+        except Exception:
+            pass
 
 
 def _load_dark_textures():
@@ -209,6 +232,7 @@ def _ensure_all_textures():
     _load_env_textures()
     _load_char_textures()
     _load_plant_textures()
+    _load_wise_man_textures()
     _load_dark_textures()
 
 
@@ -424,6 +448,21 @@ def draw_character(sx: int, sy: int, facing, frame: int):
         _rect(sx, sy, 32, 32, 11)
 
 
+def draw_wise_man(sx: int, sy: int, facing):
+    """Draw the wise-man sprite at pyxel-style top-left (sx, sy)."""
+    if _wise_man_textures:
+        if facing == LEFT and "left" in _wise_man_textures:
+            _blt(sx, sy, _wise_man_textures["left"])
+        elif facing == RIGHT and "right" in _wise_man_textures:
+            _blt(sx, sy, _wise_man_textures["right"])
+        elif "front" in _wise_man_textures:
+            _blt(sx, sy, _wise_man_textures["front"])
+        else:
+            _rect(sx, sy, 16, 32, 13)
+    else:
+        _rect(sx, sy, 16, 32, 13)
+
+
 def view(model: Model):
     _ensure_all_textures()
     if model.game.state == "title":
@@ -587,6 +626,67 @@ def _draw_thought_bubble(cx: int, bottom_y: int, thought: ThoughtBubble):
         ty += line_h
 
 
+def _draw_dialogue_bubble(
+    cx: int,
+    bottom_y: int,
+    text: str,
+    timer: int,
+    options: tuple[str, str] | None = None,
+):
+    """Draw a speech bubble for NPC dialogue."""
+    chars_shown = min(len(text), timer // WISE_DIALOG_CHAR_SPEED)
+    display_text = text[:chars_shown]
+    if not display_text:
+        return
+
+    font_size = _THOUGHT_FONT_SIZE
+    max_text_w = 260
+    lines = _wrap_text_by_width(display_text, max_text_w, font_size)
+    if options is not None:
+        lines.append("")
+        lines.append(f"[1] {options[0]}")
+        lines.append(f"[2] {options[1]}")
+    line_h = font_size + 4
+
+    text_w = max(_text_width(line, font_size) for line in lines)
+    text_h = len(lines) * line_h - 2
+
+    pad_x, pad_y = 8, 6
+    bw = text_w + pad_x * 2
+    bh = text_h + pad_y * 2
+    bx = cx - bw // 2
+    by = bottom_y - bh - 16
+
+    bx = max(2, min(bx, SCREEN_W - bw - 2))
+
+    _rect(bx + 2, by + 1, bw - 4, bh - 2, 7)
+    _rect(bx + 1, by + 2, bw - 2, bh - 4, 7)
+    _line(bx + 2, by, bx + bw - 3, by, 5)
+    _line(bx + 2, by + bh - 1, bx + bw - 3, by + bh - 1, 5)
+    _line(bx, by + 2, bx, by + bh - 3, 5)
+    _line(bx + bw - 1, by + 2, bx + bw - 1, by + bh - 3, 5)
+    _pset(bx + 1, by + 1, 5)
+    _pset(bx + bw - 2, by + 1, 5)
+    _pset(bx + 1, by + bh - 2, 5)
+    _pset(bx + bw - 2, by + bh - 2, 5)
+
+    # Speech-tail triangle toward the wizard.
+    tail_x = max(bx + 8, min(cx, bx + bw - 8))
+    # Triangle: use three _line calls to approximate the filled triangle
+    for dy in range(9):
+        half = int(4 * (1 - dy / 8))
+        if half > 0:
+            _line(tail_x - half, by + bh - 1 + dy, tail_x + half, by + bh - 1 + dy, 7)
+    _line(tail_x - 4, by + bh - 1, tail_x, by + bh + 8, 5)
+    _line(tail_x + 4, by + bh - 1, tail_x, by + bh + 8, 5)
+
+    ty = by + pad_y
+    for line in lines:
+        lx = bx + pad_x
+        _text(lx, ty, line, 1, font_size)
+        ty += line_h
+
+
 def _ensure_minimap(model: Model):
     global _minimap_cache_seed, _minimap_texture
     if _minimap_cache_seed == model.map.seed:
@@ -650,6 +750,37 @@ def view_play(model: Model):
         oy = obj.anchor.y - cam_y
         if 0 <= ox < VIEWPORT_W and 0 <= oy < VIEWPORT_H:
             draw_plant(ox * TILE_SIZE, oy * TILE_SIZE, obj)
+
+    # Draw wise man in world space at his spawn-adjacent tile.
+    wise = model.map.wise_man
+    if cam_x <= wise.x < cam_x + VIEWPORT_W and cam_y <= wise.y < cam_y + VIEWPORT_H:
+        wise_sx = (wise.x - cam_x) * TILE_SIZE + (TILE_SIZE - 16) // 2
+        wise_sy = (wise.y - cam_y) * TILE_SIZE
+        if px < wise.x:
+            wise_facing = LEFT
+        elif px > wise.x:
+            wise_facing = RIGHT
+        else:
+            wise_facing = DOWN
+        draw_wise_man(wise_sx, wise_sy, wise_facing)
+        if model.game.wise_dialogue is not None:
+            wise_cx = wise_sx + 8
+            wise_top = wise_sy
+            _draw_dialogue_bubble(
+                wise_cx,
+                wise_top - 6,
+                model.game.wise_dialogue.text,
+                model.game.wise_dialogue.timer,
+                model.game.wise_options if model.game.wise_dialogue_active else None,
+            )
+
+    # Hostile wizard projectiles (drawn as blue pixels and a bright core).
+    for shot in model.game.wizard_shots:
+        shot_sx = int(shot.x - cam_x * TILE_SIZE)
+        shot_sy = int(shot.y - cam_y * TILE_SIZE)
+        if 0 <= shot_sx < SCREEN_W and 0 <= shot_sy < VIEWPORT_H * TILE_SIZE:
+            _pset(shot_sx, shot_sy, 12)
+            _pset(shot_sx + 1, shot_sy, 5)
 
     # Draw player at center
     pcx = (VIEWPORT_W // 2) * TILE_SIZE
@@ -805,6 +936,27 @@ def view_dark_play(model: Model):
             _blt_scaled(mmx, mmy, tex, TILE_SIZE * 2, TILE_SIZE * 2)
         else:
             _rect(mmx, mmy, TILE_SIZE, TILE_SIZE, 2)
+
+    # Draw wizard companion when present.
+    if dw.wizard_pos is not None:
+        wise = dw.wizard_pos
+        wise_sx = (wise.x - cam_x) * TILE_SIZE + (TILE_SIZE - 16) // 2
+        wise_sy = (wise.y - cam_y) * TILE_SIZE
+        if px < wise.x:
+            wise_facing = LEFT
+        elif px > wise.x:
+            wise_facing = RIGHT
+        else:
+            wise_facing = DOWN
+        draw_wise_man(wise_sx, wise_sy, wise_facing)
+
+    # Friendly wizard projectiles.
+    for shot in dw.wizard_shots:
+        shot_sx = int((shot.x - cam_x) * TILE_SIZE)
+        shot_sy = int((shot.y - cam_y) * TILE_SIZE)
+        if 0 <= shot_sx < SCREEN_W and 0 <= shot_sy < VIEWPORT_H * TILE_SIZE:
+            _pset(shot_sx, shot_sy, 12)
+            _pset(shot_sx + 1, shot_sy, 7)
 
     # Draw player
     pcx = (VIEWPORT_W // 2) * TILE_SIZE

@@ -24,6 +24,22 @@ class ThoughtBubble:
 
 
 @dataclass(frozen=True)
+class NpcDialogueBubble:
+    text: str
+    timer: int
+    duration: int
+
+
+@dataclass(frozen=True)
+class WizardShot:
+    x: float
+    y: float
+    vx: float
+    vy: float
+    ttl: int
+
+
+@dataclass(frozen=True)
 class Player:
     pos: Point
     facing: Point
@@ -50,8 +66,9 @@ class PlantObject:
 class Map:
     tilemap: tuple[tuple[int, ...], ...]
     seed: int
-    objects: tuple[PlantObject, ...]
-    poison_water: frozenset
+    wise_man: Point = Point(0, 0)
+    objects: tuple[PlantObject, ...] = ()
+    poison_water: frozenset = frozenset()
 
     def __post_init__(self):
         object.__setattr__(self, '_anchor_set', frozenset(obj.anchor for obj in self.objects))
@@ -78,6 +95,15 @@ class Game:
     seen_memories: tuple[str, ...]
     thought_cooldown: int
     show_minimap: bool
+    wise_dialogue: NpcDialogueBubble | None = None
+    wise_options: tuple[str, str] | None = None
+    wise_dialogue_active: bool = False
+    wise_dialogue_node: str = ""
+    wise_outcome: str = "none"  # "none" | "attack" | "follow"
+    wise_dialogue_cooldown: int = 0
+    wise_dialogue_index: int = 0
+    wizard_shots: tuple[WizardShot, ...] = ()
+    wizard_attack_cooldown: int = 0
 
 
 @dataclass(frozen=True)
@@ -119,6 +145,10 @@ class DarkWorld:
     projectiles: tuple[Projectile, ...]
     arena_tiles: tuple[tuple[int, ...], ...]
     tick: int = 0
+    wizard_pos: Point | None = None
+    wizard_shots: tuple[WizardShot, ...] = ()
+    wizard_attack_cooldown: int = 0
+    wizard_follow_timer: int = 0
 
 
 @dataclass(frozen=True)
@@ -146,8 +176,6 @@ def init() -> tuple[Model, list]:
         map=Map(
             tilemap=(),
             seed=0,
-            objects=(),
-            poison_water=frozenset(),
         ),
         cycle=Cycle(
             number=1,
