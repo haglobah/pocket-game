@@ -54,6 +54,7 @@ from .constants import (
     DEATH_SCREEN_MIN_FRAMES,
     REWIND_DURATION,
     THOUGHT_CHAR_SPEED,
+    _KARL_BG_COLOR,
 )
 from .model import Model, PlantObject, ThoughtBubble
 
@@ -84,12 +85,6 @@ def _col(idx: int) -> tuple:
     return PYXEL_PALETTE[idx]
 
 
-# --- Background removal helpers ---
-_KARL_BG_COLOR = (126, 32, 114)  # pyxel color 2 (dark purple)
-_SAND_BG_COLOR = np.array([237, 199, 176], dtype=float)
-_SAND_BG_TOLERANCE = 20.0
-
-
 def _remove_color_key(img: PILImage.Image, color: tuple[int, int, int]) -> PILImage.Image:
     """Replace exact RGB color with transparency."""
     img = img.convert("RGBA")
@@ -97,17 +92,6 @@ def _remove_color_key(img: PILImage.Image, color: tuple[int, int, int]) -> PILIm
     mask = (arr[:, :, 0] == color[0]) & (arr[:, :, 1] == color[1]) & (arr[:, :, 2] == color[2])
     arr[mask, 3] = 0
     return PILImage.fromarray(arr)
-
-
-def _remove_sand_background(img: PILImage.Image) -> PILImage.Image:
-    """Replace sand-colored pixels with transparency."""
-    img = img.convert("RGBA")
-    arr = np.array(img).astype(float)
-    dist = np.sqrt(np.sum((arr[:, :, :3] - _SAND_BG_COLOR) ** 2, axis=2))
-    mask = dist < _SAND_BG_TOLERANCE
-    out = np.array(img)
-    out[mask, 3] = 0
-    return PILImage.fromarray(out)
 
 
 def _pil_to_texture(img: PILImage.Image, name: str) -> arcade.Texture:
@@ -156,15 +140,13 @@ def _load_plant_textures():
     global _plant_textures, _plant_eaten_textures
     if _plant_textures is not None:
         return
-    src = PILImage.open(str(_PROJECT_ROOT / "assets" / "sprites" / "also_without_berries.png")).convert("RGBA")
+    sheet = arcade.SpriteSheet(str(_PROJECT_ROOT / "assets" / "sprites" / "also_without_berries.png"))
     _plant_textures = {}
     _plant_eaten_textures = {}
     plant_x = {"palm_tree": 96, "cactus": 64, "bush_berry": 32}
     for kind, sx in plant_x.items():
-        crop = src.crop((sx, 32, sx + 32, 64))
-        _plant_textures[kind] = _pil_to_texture(_remove_sand_background(crop), f"plant_{kind}")
-        crop_e = src.crop((sx + 96, 32, sx + 128, 64))
-        _plant_eaten_textures[kind] = _pil_to_texture(_remove_sand_background(crop_e), f"plant_{kind}_eaten")
+        _plant_textures[kind] = sheet.get_texture(LBWH(sx, 32, 32, 32))
+        _plant_eaten_textures[kind] = sheet.get_texture(LBWH(sx + 96, 32, 32, 32))
 
 
 def _load_dark_textures():

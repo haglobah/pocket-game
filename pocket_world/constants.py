@@ -156,3 +156,6 @@ DIR_NAME = {
     DOWN_LEFT: "DOWN_LEFT",
     DOWN_RIGHT: "DOWN_RIGHT",
 }
+
+# --- Background removal helpers ---
+_KARL_BG_COLOR = (126, 32, 114)  # pyxel color 2 (dark purple)
