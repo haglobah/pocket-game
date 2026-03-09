@@ -49,8 +49,10 @@
               inputs'.pyxel.packages.default
               ruff
               ffmpeg
+              uv
               # (python3.withPackages (pp: [
               #   pp.pillow # for example
+              #   # pp.arcade # for example
               # ]))
             ];
             shellHook = "";
