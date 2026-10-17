@@ -46,16 +46,45 @@
             packages = with pkgs; [
               nixfmt
               just
-              inputs'.pyxel.packages.default
+              # inputs'.pyxel.packages.default
               ruff
               ffmpeg
               uv
+              python313 # .venv base; must share glibc with /run/opengl-driver
+              ninja
+              pkg-config
+              alsa-lib
+              libjack2
+              libGL
               # (python3.withPackages (pp: [
-              #   pp.pillow # for example
+              #   pp.ninja
               #   # pp.arcade # for example
               # ]))
             ];
-            shellHook = "";
+            shellHook = ''
+              export NINJA=$(which ninja)
+              # The SDL inside the pyxel wheel dlopens these at runtime.
+              # /run/opengl-driver/lib holds the NixOS GPU driver behind libGL.
+              export LD_LIBRARY_PATH=${
+                pkgs.lib.makeLibraryPath (
+                  with pkgs;
+                  [
+                    libGL
+                    alsa-lib
+                    libpulseaudio
+                    pipewire
+                    wayland
+                    libxkbcommon
+                    libdecor
+                    libx11
+                    libxcursor
+                    libxrandr
+                    libxi
+                    libxext
+                  ]
+                )
+              }:/run/opengl-driver/lib:$LD_LIBRARY_PATH
+            '';
           };
         };
       flake = {
